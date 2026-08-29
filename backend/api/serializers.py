@@ -13,9 +13,9 @@ from typing import Any
 from rest_framework import serializers
 
 from risk_engine.ingestion import SeverityClass
-from risk_engine.simulation import DEFAULT_SENSITIVITY_YEARS
 
 from .pipeline import (
+    DEFAULT_GRID_YEARS,
     DEFAULT_SEED,
     DEFAULT_THRESHOLD,
     DEFAULT_WINDOW_HOURS,
@@ -326,7 +326,7 @@ class SimulationRequestSerializer(serializers.Serializer):
     )
     sensitivity_years = serializers.IntegerField(
         required=False,
-        default=DEFAULT_SENSITIVITY_YEARS,
+        default=DEFAULT_GRID_YEARS,
         min_value=MIN_YEARS,
         max_value=MAX_YEARS,
         help_text="Years per sensitivity cell.",

@@ -188,6 +188,30 @@ workers OOM-kill the process within seconds of the first `POST /api/simulate/`.
 Raise `WEB_CONCURRENCY` on an instance with the memory for it; no rebuild needed.
 Measured on a 512 MB container: 138 MB idle, 152 MB after a 200,000-year run.
 
+### CPU, and why the API's defaults are smaller than the CLI's
+
+A free instance runs at roughly **4.2 ms per simulated year** — about fourteen
+times slower than a workstation. The API therefore defaults to a **5,000-year**
+simulation and a **9 × 1,000-year** sensitivity grid, which the background
+warm-up absorbs in about a minute. The earlier defaults — 25,000 years plus a
+9 × 10,000 grid — needed some eight minutes of CPU and never survived the
+gateway timeout, so every uncached request returned 502.
+
+Three environment variables tune this without a rebuild:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `RISK_ENGINE_DEFAULT_YEARS` | `5000` | Years the API simulates when the caller does not say |
+| `RISK_ENGINE_SENSITIVITY_YEARS` | `1000` | Years per cell of the 3×3 grid |
+| `RISK_ENGINE_MAX_YEARS` | `200000` | Hard cap on what a caller may request |
+
+The CLI is untouched at 100,000 years — it has a whole machine to itself.
+
+On a free instance, raising `n_years` from the UI still works but is slow: 25,000
+years is about two minutes of compute, and anything past that will outlive the
+platform's request timeout. Lower `RISK_ENGINE_MAX_YEARS` if you would rather the
+API refuse those requests than hang on them.
+
 The simulation endpoint is capped at **200,000 years** and defaults to 25,000
 precisely because one caller should not be able to occupy a worker indefinitely
 on an instance this small.

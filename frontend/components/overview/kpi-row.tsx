@@ -1,5 +1,7 @@
+import Link from "next/link";
+
 import { StatTile } from "@/components/ui/stat-tile";
-import { compactEur, fullEur, fullNumber } from "@/lib/format";
+import { compactEur, fullNumber } from "@/lib/format";
 
 export interface Headline {
   totalEvents: number;
@@ -9,9 +11,8 @@ export interface Headline {
   lambdaTotal: number;
   episodes: number;
   observedDays: number;
-  aal: number;
-  medianYear: number;
-  simulatedYears: number;
+  /** Null while the engine is still computing it, or if that one call failed. */
+  loss: { aal: number; medianYear: number; simulatedYears: number } | null;
 }
 
 /**
@@ -50,20 +51,42 @@ export function KpiRow({ headline }: { headline: Headline }) {
         format="perYear"
         caption={`${fullNumber(headline.episodes)} episodes over ${headline.observedDays} observed days`}
       />
-      <StatTile
-        index={3}
-        label="Average annual loss"
-        value={headline.aal}
-        format="eur"
-        caption={`Median year ${compactEur(headline.medianYear)} · ${fullNumber(
-          headline.simulatedYears,
-        )} simulated years`}
-      />
+      {headline.loss ? (
+        <StatTile
+          index={3}
+          label="Average annual loss"
+          value={headline.loss.aal}
+          format="eur"
+          caption={`Median year ${compactEur(headline.loss.medianYear)} · ${fullNumber(
+            headline.loss.simulatedYears,
+          )} simulated years`}
+        />
+      ) : (
+        <PendingTile />
+      )}
     </section>
   );
 }
 
-/** The full figures, for the caption a reader checks the compacted ones against. */
-export function headlineFootnote(headline: Headline): string {
-  return `AAL ${fullEur(headline.aal)} · ${fullNumber(headline.totalEvents)} distinct events`;
+/**
+ * Stands in for the loss figure while the engine is still warming.
+ *
+ * Deliberately not a zero and not a skeleton that never resolves: it says which
+ * figure is missing and why, so a reader is never left wondering whether the
+ * answer is "nothing" or "not yet".
+ */
+function PendingTile() {
+  return (
+    <div className="rounded-xl border border-navy-800 bg-navy-900 p-5 shadow-card">
+      <p className="text-xs font-medium text-ink-secondary">Average annual loss</p>
+      <p className="mt-3 text-3xl font-semibold tracking-tight text-ink-muted">—</p>
+      <p className="mt-2 text-xs text-ink-muted">
+        The simulation is still warming up. Reload in a minute, or open{" "}
+        <Link href="/simulation" className="text-accent underline-offset-2 hover:underline">
+          Simulation
+        </Link>
+        .
+      </p>
+    </div>
+  );
 }

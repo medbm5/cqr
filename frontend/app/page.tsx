@@ -1,8 +1,8 @@
 import { Hero } from "@/components/overview/hero";
 import { KpiRow, type Headline } from "@/components/overview/kpi-row";
 import { ApiUnavailable } from "@/components/overview/unavailable";
-import { Card, CardHeader } from "@/components/ui/card";
 import { NAV_ITEMS } from "@/components/shell/nav-items";
+import { Card, CardHeader } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import Link from "next/link";
 
@@ -15,33 +15,46 @@ import Link from "next/link";
  */
 export const dynamic = "force-dynamic";
 
-async function loadHeadline(): Promise<Headline | { error: string }> {
-  try {
-    const [telemetry, frequency, simulation] = await Promise.all([
-      api.telemetry(),
-      api.frequency(),
-      // Deliberately no n_years or seed: the API's own defaults are the set the
-      // server warms on boot, so asking for anything else here would compute a
-      // fresh simulation on the landing page's critical path.
-      api.simulate({ curve_points: 2 }),
-    ]);
+function describe(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason);
+}
 
-    const report = telemetry.normalization;
-    return {
-      totalEvents: report.total_events,
-      rawRows: report.rows_read,
-      duplicatesMerged: report.duplicates_merged,
-      dedupRate: report.duplicates_merged / report.rows_read,
-      lambdaTotal: frequency.lambda_total,
-      episodes: frequency.episodes,
-      observedDays: frequency.observed_days,
-      aal: simulation.metrics.aal,
-      medianYear: simulation.metrics.median,
-      simulatedYears: simulation.n_years,
-    };
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) };
+async function loadHeadline(): Promise<Headline | { error: string }> {
+  // The two cheap reads decide whether the page can render at all. The
+  // simulation is the expensive one - on a small instance it can still be
+  // warming up - so it is fetched alongside them and allowed to fail without
+  // taking the rest of the page down. Losing one figure is not losing the page.
+  const [telemetry, frequency, simulation] = await Promise.allSettled([
+    api.telemetry(),
+    api.frequency(),
+    api.simulate({ curve_points: 2 }),
+  ]);
+
+  if (telemetry.status === "rejected") {
+    return { error: describe(telemetry.reason) };
   }
+  if (frequency.status === "rejected") {
+    return { error: describe(frequency.reason) };
+  }
+
+  const report = telemetry.value.normalization;
+  return {
+    totalEvents: report.total_events,
+    rawRows: report.rows_read,
+    duplicatesMerged: report.duplicates_merged,
+    dedupRate: report.duplicates_merged / report.rows_read,
+    lambdaTotal: frequency.value.lambda_total,
+    episodes: frequency.value.episodes,
+    observedDays: frequency.value.observed_days,
+    loss:
+      simulation.status === "fulfilled"
+        ? {
+            aal: simulation.value.metrics.aal,
+            medianYear: simulation.value.metrics.median,
+            simulatedYears: simulation.value.n_years,
+          }
+        : null,
+  };
 }
 
 export default async function Overview() {

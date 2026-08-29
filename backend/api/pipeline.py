@@ -12,6 +12,7 @@ testable without an HTTP server.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from dataclasses import dataclass
 from functools import lru_cache
@@ -33,19 +34,42 @@ from risk_engine.ingestion import (
 )
 from risk_engine.severity import SeverityModel, fit_severity_model, load_incidents
 from risk_engine.simulation import (
-    DEFAULT_SENSITIVITY_YEARS,
     SensitivityGrid,
     SimulationResult,
     sensitivity_grid,
     simulate,
 )
 
+
 #: Simulation sizes the API will accept. A hundred thousand years takes about
 #: half a minute, which is not a request; the cap keeps a single caller from
 #: occupying a worker, and the cache makes a repeated request instant.
+def _env_int(name: str, default: int) -> int:
+    """Read an integer environment override, falling back to the default."""
+    raw = os.environ.get(name)
+    try:
+        return int(raw) if raw else default
+    except ValueError:
+        return default
+
+
 MIN_YEARS = 100
-MAX_YEARS = 200_000
-DEFAULT_YEARS = 25_000
+
+#: Simulation sizes the API will accept and serve by default.
+#:
+#: Sized for the instance, not for the model. Measured on a Render free tier at
+#: roughly 4.2 ms per simulated year - about fourteen times slower than a
+#: workstation - so the 25,000-year default and its 9 x 10,000-year sensitivity
+#: grid needed some eight minutes of CPU and never survived the gateway timeout.
+#: Five thousand years plus a 9 x 1,000 grid is about a minute, which the
+#: background warm-up absorbs before anyone asks for it.
+#:
+#: Both are environment overrides so a larger instance can raise them without a
+#: rebuild, and the CLI - which has a whole machine to itself - is untouched at
+#: 100,000 years.
+MAX_YEARS = _env_int("RISK_ENGINE_MAX_YEARS", 200_000)
+DEFAULT_YEARS = _env_int("RISK_ENGINE_DEFAULT_YEARS", 5_000)
+DEFAULT_GRID_YEARS = _env_int("RISK_ENGINE_SENSITIVITY_YEARS", 1_000)
 
 #: The default request, in one place.
 #:
@@ -213,7 +237,7 @@ def warm_start() -> None:
             # argument - including the sensitivity grid, which a default POST
             # asks for and which costs nine more simulations.
             get_simulation(DEFAULT_YEARS, DEFAULT_SEED, DEFAULT_THRESHOLD, DEFAULT_WINDOW_HOURS)
-            get_sensitivity(DEFAULT_SEED, DEFAULT_SENSITIVITY_YEARS)
+            get_sensitivity(DEFAULT_SEED, DEFAULT_GRID_YEARS)
         except Exception:
             logger.exception("warm start failed; the first request will pay for it")
         else:
