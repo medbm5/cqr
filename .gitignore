@@ -1,0 +1,50 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# ---- Django ----
+*.sqlite3
+db.sqlite3
+staticfiles/
+media/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---- Env ----
+.env
+.env.*
+!.env.example
+
+# ---- Notebooks ----
+.ipynb_checkpoints/
+
+# ---- Pipeline / derived artefacts (never commit) ----
+results.json
+data/derived/
+dist-archive/
+*.zip
+
+# ---- Editors / OS ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

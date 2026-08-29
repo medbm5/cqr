@@ -1,0 +1,7 @@
+# Normalize to LF in the repository; the working copy stays platform-native.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.zip binary
+*.csv text eol=lf
