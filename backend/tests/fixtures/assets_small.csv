@@ -1,0 +1,3 @@
+asset_id,asset_type,business_criticality,environment
+asset-0001,server,5,prod
+asset-0002,workstation,2,dev

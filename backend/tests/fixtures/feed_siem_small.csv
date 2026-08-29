@@ -1,0 +1,8 @@
+event_id,asset_id,mitre_technique,severity,detected_at,source
+evt-1,asset-0001,T1001,High,2026-01-01T12:00:00,ids
+evt-2,asset-0001,T1002,Low,2026-01-01T13:00:00,auth
+evt-3,asset-0002,T1003,Critical,2026-01-01T14:00:00,proxy
+evt-4,asset-0001,T1004,,2026-01-01T15:00:00,endpoint
+evt-5,asset-0001,T1002,Medium,2026-01-01T13:00:00,auth
+evt-6,,T1005,High,2026-01-01T16:00:00,firewall
+evt-7,asset-0009,T1006,Low,2026-01-01T17:00:00,ids
