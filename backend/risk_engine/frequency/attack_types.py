@@ -1,5 +1,8 @@
 """Translation from MITRE ATT&CK techniques to the attack types losses are priced in.
 
+The vocabulary itself lives in `risk_engine.attack_types`, shared with the
+severity stage; this module owns only the telemetry-to-vocabulary mapping.
+
 Frequency is estimated per attack type because that is the only vocabulary the
 two halves of the model share: the telemetry speaks in ATT&CK techniques, the
 external incident base in attack types. This module is the single place the two
@@ -14,28 +17,9 @@ arguable are marked below.
 
 from __future__ import annotations
 
-from enum import StrEnum
-
-
-class AttackType(StrEnum):
-    """Attack vocabulary shared with the external incident base.
-
-    The eight named types are exactly those present in `cyber_incidents.csv`.
-    `OTHER` is the fallback for techniques with no defensible home among them; it
-    is reported rather than hidden, so a growing `OTHER` share is visible as a
-    signal that the mapping needs revisiting.
-    """
-
-    PHISHING = "phishing"
-    RANSOMWARE = "ransomware"
-    CREDENTIAL_THEFT = "credential_theft"
-    DATA_BREACH = "data_breach"
-    MISCONFIGURATION = "misconfiguration"
-    DDOS = "ddos"
-    INSIDER_ERROR = "insider_error"
-    SUPPLY_CHAIN = "supply_chain"
-    OTHER = "other"
-
+# Re-exported so the frequency stage reads as one vocabulary, even though the
+# enum itself is shared with severity.
+from risk_engine.attack_types import AttackType as AttackType
 
 #: Every technique observed in the case telemetry, mapped to an attack type.
 #:

@@ -38,3 +38,35 @@ def window(days):
     from risk_engine.ingestion import TimeWindow
 
     return TimeWindow(start=BASE, end=BASE + timedelta(days=days - 1), observed_days=days)
+
+
+def incident(
+    incident_id="inc-1",
+    *,
+    sector="Retail",
+    size="ETI",
+    maturity=55.0,
+    attack_type=None,
+    loss=100_000.0,
+    employees=1200,
+):
+    """Build one cleaned `Incident`, defaulting to an exact peer of the target."""
+    from datetime import date as _date
+
+    from risk_engine.attack_types import AttackType
+    from risk_engine.severity.cleaning import Incident
+
+    return Incident(
+        incident_id=incident_id,
+        company_id="ORG-1",
+        occurred_on=_date(2024, 1, 15),
+        sector=sector,
+        company_size=size,
+        employees=employees,
+        attack_type=attack_type or AttackType.RANSOMWARE,
+        severity="major",
+        security_maturity_score=maturity,
+        records_exposed=100.0,
+        downtime_hours=5.0,
+        loss_eur=loss,
+    )
