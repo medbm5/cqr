@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 
+import { HintTip } from "@/components/HintTip";
 import { Card, CardHeader } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import type { AttackType, SeverityResponse } from "@/lib/api";
@@ -75,6 +76,8 @@ export function SeverityView({ severity }: { severity: SeverityResponse }) {
           label="Typical incident (median)"
           value={fit.median_eur}
           format="eur"
+          term="median_incident"
+          captionTerm="mu"
           caption={`exp(μ) with μ = ${fit.mu.toFixed(3)}`}
         />
         <StatTile
@@ -82,6 +85,8 @@ export function SeverityView({ severity }: { severity: SeverityResponse }) {
           label="Average incident (mean)"
           value={fit.mean_eur}
           format="eur"
+          term="mean_incident"
+          captionTerm="sigma"
           caption={`exp(μ + σ²/2), σ = ${fit.sigma.toFixed(3)}`}
         />
         <StatTile
@@ -89,6 +94,7 @@ export function SeverityView({ severity }: { severity: SeverityResponse }) {
           label="Peer incidents"
           value={fit.observations}
           format="count"
+          term="peer_weight"
           caption={
             fit.used_pooled
               ? "Too thin to fit alone — priced at the pooled rate"
@@ -100,13 +106,18 @@ export function SeverityView({ severity }: { severity: SeverityResponse }) {
           label="Effective sample"
           value={fit.effective_n}
           format="count"
+          term="kish_neff"
+          captionTerm="fallback"
           caption={`Kish n_eff; the fallback threshold is ${severity.min_effective_n}`}
         />
       </section>
 
       {fit.used_pooled ? (
         <p className="mb-4 rounded-lg border border-caution/30 bg-caution/5 px-4 py-3 text-xs leading-relaxed text-ink-secondary">
-          <span className="font-semibold text-caution">Pooled fallback.</span>{" "}
+          <span className="font-semibold text-caution">
+            Pooled fallback
+            <HintTip term="fallback" />.
+          </span>{" "}
           {fit.observations === 0
             ? "The incident base holds no incidents of this type, so it is priced at the pooled rate across every type."
             : `Its effective sample size is below ${severity.min_effective_n}, so it is priced at the pooled rate rather than on parameters a thin sample would make look confident.`}
@@ -120,7 +131,11 @@ export function SeverityView({ severity }: { severity: SeverityResponse }) {
           <QqPlot fit={fit} />
 
           <Card>
-            <CardHeader title="Peer group" hint="Soft weighting, never a hard filter" />
+            <CardHeader
+              title="Peer group"
+              hint="Soft weighting, never a hard filter"
+              term="peer_weight"
+            />
             <div className="space-y-4 px-5 py-4">
               <p className="text-xs leading-relaxed text-ink-secondary">
                 Filtering to exact peers keeps 112 of {fullNumber(severity.incidents_fitted)}{" "}
@@ -137,20 +152,20 @@ export function SeverityView({ severity }: { severity: SeverityResponse }) {
               <dl className="space-y-2 text-xs">
                 {[
                   {
-                    term: "Sector",
+                    name: "Sector",
                     value: `${peers.sector_match_weight} if ${peers.target_sector}, else ${peers.sector_other_weight}`,
                   },
                   {
-                    term: "Size",
+                    name: "Size",
                     value: `${peers.size_match_weight} if ${peers.target_size}, else ${peers.size_other_weight}`,
                   },
                   {
-                    term: "Maturity",
+                    name: "Maturity",
                     value: `Gaussian kernel on |maturity − ${peers.target_maturity}|, h = ${peers.maturity_bandwidth}`,
                   },
                 ].map((row) => (
-                  <div key={row.term} className="flex gap-3">
-                    <dt className="w-16 shrink-0 font-medium text-ink-secondary">{row.term}</dt>
+                  <div key={row.name} className="flex gap-3">
+                    <dt className="w-16 shrink-0 font-medium text-ink-secondary">{row.name}</dt>
                     <dd className="min-w-0 text-ink-muted">{row.value}</dd>
                   </div>
                 ))}

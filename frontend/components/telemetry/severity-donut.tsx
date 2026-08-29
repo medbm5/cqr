@@ -42,6 +42,7 @@ export function SeverityDonut({ mix }: { mix: Record<string, number> }) {
   return (
     <ChartFrame
       title="Severity mix"
+      term="attack_grade"
       hint={`${fullNumber(total)} distinct events; the worst grade wins where feeds disagree`}
       legend={data.map((entry) => ({ label: entry.label, color: String(entry.color) }))}
       columns={[

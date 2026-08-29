@@ -1,6 +1,8 @@
+import { HintTip } from "@/components/HintTip";
 import { Card, CardHeader } from "@/components/ui/card";
 import type { NormalizationReport } from "@/lib/api";
 import { fullNumber, percent } from "@/lib/format";
+import type { GlossaryKey } from "@/lib/glossary";
 
 function day(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -18,7 +20,7 @@ function day(iso: string): string {
  * wants to read them, not measure them.
  */
 export function NormalizationCard({ report }: { report: NormalizationReport }) {
-  const rows = [
+  const rows: { label: string; value: string; note: string; term?: GlossaryKey }[] = [
     {
       label: "Raw rows read",
       value: fullNumber(report.rows_read),
@@ -30,6 +32,7 @@ export function NormalizationCard({ report }: { report: NormalizationReport }) {
       label: "Duplicate reports merged",
       value: fullNumber(report.duplicates_merged),
       note: `${fullNumber(report.events_in_both_feeds)} of them seen by both feeds`,
+      term: "dedup",
     },
     {
       label: "Distinct events",
@@ -45,6 +48,7 @@ export function NormalizationCard({ report }: { report: NormalizationReport }) {
       label: "Annualization factor",
       value: report.window.annualization_factor.toFixed(6),
       note: `365 / ${report.window.observed_days}, recomputed from the data`,
+      term: "annualization",
     },
     {
       label: "Unknown assets",
@@ -63,7 +67,10 @@ export function NormalizationCard({ report }: { report: NormalizationReport }) {
         {rows.map((row) => (
           <div key={row.label} className="flex items-baseline justify-between gap-4 px-5 py-3">
             <div className="min-w-0">
-              <dt className="text-xs font-medium text-ink-secondary">{row.label}</dt>
+              <dt className="text-xs font-medium text-ink-secondary">
+                {row.label}
+                {row.term ? <HintTip term={row.term} /> : null}
+              </dt>
               <dd className="mt-0.5 truncate text-xs text-ink-muted">{row.note}</dd>
             </div>
             <dd className="tabular shrink-0 text-sm font-semibold text-ink">{row.value}</dd>

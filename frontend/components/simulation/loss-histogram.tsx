@@ -44,6 +44,8 @@ export function LossHistogram({
   return (
     <ChartFrame
       title="Simulated annual loss"
+      term="monte_carlo"
+      hintTerm="poisson"
       hint={`${fullNumber(years)} independent years, binned`}
       columns={[
         { key: "range", label: "Annual loss between" },

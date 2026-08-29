@@ -99,8 +99,8 @@ Requires Python 3.11+ and Node 20+.
 
 ```bash
 make install     # editable backend install, pre-commit hooks, npm install
-make lint        # ruff, ruff format, mypy strict on risk_engine, next lint
-make test        # 243 tests, 99% coverage
+make lint        # ruff, ruff format, mypy strict on risk_engine, next lint + tsc
+make test        # 255 backend tests (99% coverage on risk_engine) + 13 frontend tests
 ```
 
 **Run the whole pipeline with no server at all:**

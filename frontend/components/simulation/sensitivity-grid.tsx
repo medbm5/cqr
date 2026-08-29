@@ -34,6 +34,7 @@ export function SensitivityGrid({ grid }: { grid: Grid }) {
   return (
     <ChartFrame
       title="Sensitivity to the two frequency conventions"
+      hintTerm="seed"
       hint={`${fullNumber(grid.n_years)} years per cell, all on seed ${grid.seed}`}
       columns={[
         { key: "threshold", label: "Threshold" },

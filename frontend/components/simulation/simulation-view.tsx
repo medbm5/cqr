@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { HintTip } from "@/components/HintTip";
 import { ApiUnavailable } from "@/components/overview/unavailable";
 import { ExplanationTrace } from "@/components/frequency/explanation-trace";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
@@ -78,9 +79,14 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
     <>
       <div className="mb-6 flex flex-wrap items-end gap-x-8 gap-y-4 rounded-xl border border-navy-800 bg-navy-900 px-5 py-4">
         <div>
-          <label htmlFor="years" className="block text-xs font-medium text-ink-secondary">
-            Simulated years
-          </label>
+          {/* Beside the label, not inside it: a button in a `for`-bound label
+              activates the control it labels. */}
+          <div className="flex items-baseline">
+            <label htmlFor="years" className="text-xs font-medium text-ink-secondary">
+              Simulated years
+            </label>
+            <HintTip term="monte_carlo" />
+          </div>
           <select
             id="years"
             value={years}
@@ -96,9 +102,12 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
         </div>
 
         <div>
-          <label htmlFor="seed" className="block text-xs font-medium text-ink-secondary">
-            Seed
-          </label>
+          <div className="flex items-baseline">
+            <label htmlFor="seed" className="text-xs font-medium text-ink-secondary">
+              Seed
+            </label>
+            <HintTip term="seed" />
+          </div>
           <input
             id="seed"
             type="number"
@@ -158,6 +167,7 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
             <Card className="px-6 py-8 sm:px-8 sm:py-10">
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
                 Average annual loss
+                <HintTip term="aal" />
               </p>
               <AnimatedCounter
                 value={metrics.aal}
@@ -167,7 +177,8 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
               />
               <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-secondary">
                 {fullEur(metrics.aal)} a year across {fullNumber(result.n_years)} simulated
-                years. A median year costs {fullEur(metrics.median)}
+                years. A median year
+                <HintTip term="median_year" /> costs {fullEur(metrics.median)}
                 {metrics.median > 0
                   ? `, so the mean sits ${(metrics.aal / metrics.median).toFixed(1)}× above the typical one.`
                   : "."}
@@ -183,6 +194,7 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
             <StatTile
               index={0}
               label="VaR 95"
+              term="var95"
               value={metrics.var_95}
               format="eur"
               caption="A 1-in-20 year reaches this"
@@ -190,6 +202,7 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
             <StatTile
               index={1}
               label="TVaR 95"
+              term="tvar95"
               value={metrics.tvar_95}
               format="eur"
               caption="Mean of the worst 5% of years"
@@ -197,6 +210,7 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
             <StatTile
               index={2}
               label="VaR 99"
+              term="var99"
               value={metrics.var_99}
               format="eur"
               caption="A 1-in-100 year reaches this"
@@ -204,6 +218,7 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
             <StatTile
               index={3}
               label="TVaR 99"
+              term="tvar99"
               value={metrics.tvar_99}
               format="eur"
               caption="Mean of the worst 1% of years"

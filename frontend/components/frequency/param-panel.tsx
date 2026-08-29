@@ -1,5 +1,6 @@
 "use client";
 
+import { HintTip } from "@/components/HintTip";
 import type { SeverityClass } from "@/lib/api";
 
 const THRESHOLDS: { value: SeverityClass; label: string }[] = [
@@ -35,12 +36,14 @@ export function ParamPanel({
   return (
     <div className="mb-6 flex flex-wrap items-end gap-x-8 gap-y-4 rounded-xl border border-navy-800 bg-navy-900 px-5 py-4">
       <div>
-        <label
-          htmlFor="threshold"
-          className="block text-xs font-medium text-ink-secondary"
-        >
-          Attack-grade threshold
-        </label>
+        {/* The hint sits beside the label, not inside it: a button inside a
+            `for`-bound label activates the control it labels on every click. */}
+        <div className="flex items-baseline">
+          <label htmlFor="threshold" className="text-xs font-medium text-ink-secondary">
+            Attack-grade threshold
+          </label>
+          <HintTip term="attack_grade" />
+        </div>
         <select
           id="threshold"
           value={threshold}
@@ -58,10 +61,15 @@ export function ParamPanel({
       </div>
 
       <div className="min-w-56 flex-1">
-        <label htmlFor="window" className="flex items-baseline justify-between text-xs">
-          <span className="font-medium text-ink-secondary">Session window</span>
+        <div className="flex items-baseline justify-between text-xs">
+          <span className="flex items-baseline">
+            <label htmlFor="window" className="font-medium text-ink-secondary">
+              Session window
+            </label>
+            <HintTip term="session_window" />
+          </span>
           <span className="tabular text-ink">{windowHours}h</span>
-        </label>
+        </div>
         <input
           id="window"
           type="range"

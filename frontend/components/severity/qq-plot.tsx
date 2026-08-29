@@ -42,6 +42,8 @@ export function QqPlot({ fit }: { fit: SeverityFit }) {
   return (
     <ChartFrame
       title="QQ plot of log-losses"
+      term="qq_plot"
+      hintTerm="ks"
       hint={
         tail?.pareto_fits_tail_better
           ? `Weighted KS ${fit.diagnostics.weighted_ks.toFixed(3)} · a Pareto tail (α ${tail.alpha.toFixed(2)}) fits the extremes better`

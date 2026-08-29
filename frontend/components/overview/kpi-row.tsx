@@ -31,6 +31,7 @@ export function KpiRow({ headline }: { headline: Headline }) {
         label="Distinct events"
         value={headline.totalEvents}
         format="count"
+        term="dedup"
         caption={`From ${fullNumber(headline.rawRows)} raw rows across two feeds`}
       />
       <StatTile
@@ -38,6 +39,7 @@ export function KpiRow({ headline }: { headline: Headline }) {
         label="Deduplicated"
         value={headline.dedupRate}
         format="percent"
+        term="dedup"
         delta={{
           label: `${fullNumber(headline.duplicatesMerged)} rows`,
           direction: "down",
@@ -53,6 +55,8 @@ export function KpiRow({ headline }: { headline: Headline }) {
         label="Loss incidents per year"
         value={headline.lambdaIncident ?? 0}
         format="rate"
+        term="lambda_incident"
+        captionTerm="lambda_detected"
         caption={`From ${fullNumber(Math.round(headline.lambdaDetected))} detected attacks/yr, calibrated on the peer base`}
       />
       {headline.loss ? (
@@ -61,6 +65,8 @@ export function KpiRow({ headline }: { headline: Headline }) {
           label="Average annual loss"
           value={headline.loss.aal}
           format="eur"
+          term="aal"
+          captionTerm="median_year"
           caption={`Median year ${compactEur(headline.loss.medianYear)} · ${fullNumber(
             headline.loss.simulatedYears,
           )} simulated years`}

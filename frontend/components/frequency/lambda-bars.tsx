@@ -64,6 +64,8 @@ export function LambdaBars({
   return (
     <ChartFrame
       title="Detected attacks per year, by type"
+      term="lambda_detected"
+      hintTerm="lambda_incident"
       hint={
         frequency.lambda_incident === null
           ? `${fullNumber(frequency.episodes)} episodes over ${frequency.observed_days} days, annualized`

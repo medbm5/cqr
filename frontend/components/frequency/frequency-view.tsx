@@ -93,6 +93,8 @@ export function FrequencyView({ initial }: { initial: FrequencyBundle }) {
           label="Detected attacks per year"
           value={frequency.lambda_detected}
           format="count"
+          term="lambda_detected"
+          captionTerm="annualization"
           caption={`Annualized from ${frequency.observed_days} observed days`}
         />
         <StatTile
@@ -100,6 +102,8 @@ export function FrequencyView({ initial }: { initial: FrequencyBundle }) {
           label="Episodes observed"
           value={frequency.episodes}
           format="count"
+          term="episode"
+          captionTerm="attack_grade"
           caption={`From ${fullNumber(frequency.events_attack_grade)} attack-grade events`}
         />
         <StatTile
@@ -107,6 +111,8 @@ export function FrequencyView({ initial }: { initial: FrequencyBundle }) {
           label="Loss incidents per year"
           value={frequency.lambda_incident ?? 0}
           format="rate"
+          term="lambda_incident"
+          captionTerm="p_materialize"
           caption={
             frequency.calibration
               ? `1 in ${fullNumber(Math.round(1 / frequency.calibration.p_materialize))} detected attacks, anchored on ${fullNumber(frequency.calibration.peer_companies)} peer organisations`

@@ -2,6 +2,9 @@
 
 import { useId, useState, type ReactNode } from "react";
 
+import { HintTip } from "@/components/HintTip";
+import type { GlossaryKey } from "@/lib/glossary";
+
 import { CHROME } from "./tokens";
 
 export interface LegendEntry {
@@ -28,6 +31,8 @@ export interface TableColumn {
 export function ChartFrame({
   title,
   hint,
+  term,
+  hintTerm,
   legend,
   columns,
   rows,
@@ -36,6 +41,10 @@ export function ChartFrame({
 }: {
   title: string;
   hint?: string;
+  /** Explains the chart's subject — the ⓘ sits beside the title. */
+  term?: GlossaryKey;
+  /** Explains a statistic quoted in the hint line, e.g. a KS distance. */
+  hintTerm?: GlossaryKey;
   legend?: LegendEntry[];
   columns: TableColumn[];
   rows: Record<string, string | number>[];
@@ -49,8 +58,16 @@ export function ChartFrame({
     <section className="rounded-xl border border-navy-800 bg-navy-900 shadow-card">
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 px-5 pt-4">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight text-ink">{title}</h2>
-          {hint ? <p className="mt-0.5 text-xs text-ink-muted">{hint}</p> : null}
+          <h2 className="text-sm font-semibold tracking-tight text-ink">
+            {title}
+            {term ? <HintTip term={term} /> : null}
+          </h2>
+          {hint ? (
+            <p className="mt-0.5 text-xs text-ink-muted">
+              {hint}
+              {hintTerm ? <HintTip term={hintTerm} /> : null}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"

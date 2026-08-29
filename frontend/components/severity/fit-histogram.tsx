@@ -63,6 +63,7 @@ export function FitHistogram({ fit }: { fit: SeverityFit }) {
   return (
     <ChartFrame
       title="Peer losses against the fitted distribution"
+      term="lognormal"
       hint="Log scale; bar heights carry the peer weighting the fit was made on"
       legend={[
         { label: "Weighted peer losses", color: SERIES.siem },

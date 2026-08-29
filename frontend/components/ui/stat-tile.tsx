@@ -2,7 +2,9 @@
 
 import { motion } from "framer-motion";
 
+import { HintTip } from "@/components/HintTip";
 import { FORMATTERS, type FormatKind } from "@/lib/format";
+import type { GlossaryKey } from "@/lib/glossary";
 
 import { AnimatedCounter } from "./animated-counter";
 
@@ -26,6 +28,10 @@ export interface StatDelta {
  * Contract: a sentence-case label, a compacted value, and *either* a delta
  * against a named baseline or a caption giving the figure its context. Not
  * both — two subtitles under one number is two things to read and no hierarchy.
+ *
+ * `term` adds the ⓘ. It coexists with `caption` rather than replacing it: the
+ * caption reminds a reader who already knows the concept how *this* number was
+ * derived, the hint teaches a reader who does not. Different jobs, both needed.
  */
 export function StatTile({
   label,
@@ -33,6 +39,8 @@ export function StatTile({
   format,
   delta,
   caption,
+  term,
+  captionTerm,
   index = 0,
 }: {
   label: string;
@@ -40,6 +48,9 @@ export function StatTile({
   format: FormatKind;
   delta?: StatDelta;
   caption?: string;
+  term?: GlossaryKey;
+  /** A second concept named in the caption — e.g. the parameter behind the figure. */
+  captionTerm?: GlossaryKey;
   index?: number;
 }) {
   return (
@@ -49,7 +60,10 @@ export function StatTile({
       transition={{ duration: 0.2, delay: index * 0.05, ease: "easeOut" }}
       className="rounded-xl border border-navy-800 bg-navy-900 p-5 shadow-card transition duration-200 ease-out hover:-translate-y-0.5 hover:border-navy-700 hover:shadow-lift"
     >
-      <p className="text-xs font-medium text-ink-secondary">{label}</p>
+      <p className="text-xs font-medium text-ink-secondary">
+        {label}
+        {term ? <HintTip term={term} /> : null}
+      </p>
 
       {/* Proportional figures: tabular-nums makes a large standalone number
           look loose, and nothing here needs to align in a column. */}
@@ -68,7 +82,12 @@ export function StatTile({
         </p>
       ) : null}
 
-      {!delta && caption ? <p className="mt-2 text-xs text-ink-muted">{caption}</p> : null}
+      {!delta && caption ? (
+        <p className="mt-2 text-xs text-ink-muted">
+          {caption}
+          {captionTerm ? <HintTip term={captionTerm} /> : null}
+        </p>
+      ) : null}
     </motion.div>
   );
 }

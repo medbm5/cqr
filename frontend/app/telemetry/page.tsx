@@ -42,16 +42,19 @@ export default async function TelemetryPage() {
       label: "Distinct events",
       value: report.total_events,
       note: `${fullNumber(report.duplicates_merged)} duplicate reports absorbed`,
+      term: "dedup",
     },
     {
       label: "Attack-grade events",
       value: data.frequency.events_attack_grade,
       note: `severity at or above ${data.frequency.params.severity_threshold}`,
+      term: "attack_grade",
     },
     {
       label: "Episodes",
       value: data.frequency.episodes,
       note: `clustered within ${data.frequency.params.session_window_hours}h per asset`,
+      term: "episode",
     },
   ];
 
@@ -62,6 +65,7 @@ export default async function TelemetryPage() {
           label: "Loss incidents / yr",
           value: data.frequency.lambda_incident,
           note: `annualized x365/${data.frequency.observed_days}, then x p = ${calibration.p_materialize.toExponential(1)} calibrated on ${fullNumber(calibration.peer_companies)} peer organisations`,
+          term: "lambda_incident",
         }
       : undefined;
 

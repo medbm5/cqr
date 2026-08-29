@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+import { HintTip } from "@/components/HintTip";
+import type { GlossaryKey } from "@/lib/glossary";
+
 /**
  * The one surface every panel sits on.
  *
@@ -33,11 +36,28 @@ export function Card({
   );
 }
 
-/** Title row of a card: a name, and optionally a note explaining the figure. */
-export function CardHeader({ title, hint }: { title: string; hint?: string }) {
+/**
+ * Title row of a card: a name, and optionally a note explaining the figure.
+ *
+ * `hint` is the note that rides in the corner; `term` is the ⓘ beside the title.
+ * Both can be present — one says what this card shows, the other says what the
+ * concept means.
+ */
+export function CardHeader({
+  title,
+  hint,
+  term,
+}: {
+  title: string;
+  hint?: string;
+  term?: GlossaryKey;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-navy-800 px-5 py-4">
-      <h2 className="text-sm font-semibold tracking-tight text-ink">{title}</h2>
+      <h2 className="text-sm font-semibold tracking-tight text-ink">
+        {title}
+        {term ? <HintTip term={term} /> : null}
+      </h2>
       {hint ? <p className="text-xs text-ink-muted">{hint}</p> : null}
     </div>
   );

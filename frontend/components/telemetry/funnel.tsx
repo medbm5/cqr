@@ -2,14 +2,18 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
+import { HintTip } from "@/components/HintTip";
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { ORDINAL_4, inkOn } from "@/components/charts/tokens";
 import { fullNumber, percent } from "@/lib/format";
+import type { GlossaryKey } from "@/lib/glossary";
 
 export interface FunnelStage {
   label: string;
   value: number;
   note: string;
+  /** The concept this stage introduces, explained on the label's ⓘ. */
+  term?: GlossaryKey;
 }
 
 /**
@@ -25,6 +29,7 @@ export interface FunnelTerminal {
   label: string;
   value: number;
   note: string;
+  term?: GlossaryKey;
 }
 
 /**
@@ -92,7 +97,10 @@ export function Funnel({
           return (
             <li key={stage.label}>
               <div className="flex items-baseline justify-between gap-4">
-                <p className="text-xs font-medium text-ink-secondary">{stage.label}</p>
+                <p className="text-xs font-medium text-ink-secondary">
+                  {stage.label}
+                  {stage.term ? <HintTip term={stage.term} /> : null}
+                </p>
                 <p className="text-xs text-ink-muted">{stage.note}</p>
               </div>
 
@@ -150,7 +158,10 @@ export function Funnel({
             className="!mt-5 border-t border-navy-800 pt-4"
           >
             <div className="flex items-baseline justify-between gap-4">
-              <p className="text-xs font-medium text-accent">{terminal.label}</p>
+              <p className="text-xs font-medium text-accent">
+                {terminal.label}
+                {terminal.term ? <HintTip term={terminal.term} /> : null}
+              </p>
               <p className="text-xs text-ink-muted">{terminal.note}</p>
             </div>
 

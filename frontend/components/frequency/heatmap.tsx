@@ -39,6 +39,7 @@ export function Heatmap({ assets, dimmed = false }: { assets: AssetRow[]; dimmed
   return (
     <ChartFrame
       title="Episodes per asset, per week"
+      term="episode"
       hint={`Darker is quieter; the busiest cell holds ${fullNumber(peak)} episodes`}
       dimmed={dimmed}
       columns={[

@@ -26,10 +26,12 @@ lint: ## ruff (lint + format check) + mypy strict on risk_engine + next lint
 	$(PY) -m ruff format --check $(BACKEND) scripts
 	$(PY) -m mypy --config-file $(BACKEND)/pyproject.toml $(BACKEND)/risk_engine
 	$(NPM) --prefix $(FRONT) run lint
+	$(NPM) --prefix $(FRONT) run typecheck
 	$(PY) scripts/build_prompts_index.py --check
 
-test: ## Run the pytest suite with coverage on risk_engine
+test: ## Run the pytest suite with coverage on risk_engine, then the frontend suite
 	$(PY) -m pytest $(BACKEND)
+	$(NPM) --prefix $(FRONT) run test
 
 api: ## Run the Django API on :8000
 	$(PY) $(BACKEND)/manage.py runserver 0.0.0.0:8000

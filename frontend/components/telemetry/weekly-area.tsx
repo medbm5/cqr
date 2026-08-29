@@ -45,6 +45,7 @@ export function WeeklyArea({ weekly }: { weekly: WeeklyBucket[] }) {
   return (
     <ChartFrame
       title="Events per week, by which feed saw them"
+      term="dedup"
       hint="Stacked: the top edge is the week's distinct event count"
       legend={SERIES_ORDER.map((entry) => ({ label: entry.label, color: entry.color }))}
       columns={[
