@@ -41,8 +41,9 @@ key** for sessionization. Both are recorded in `prompts/03_frequency.md`.
 | 8 | [08 — Telemetry and frequency views](prompts/08_web_telemetry_frequency.md) | `feat(web)` | 8 |
 | 9 | [09 — Severity and simulation views](prompts/09_web_severity_simulation.md) | `feat(web)` | 8 |
 | 10 | [10 — Deployment](prompts/10_deploy.md) | `feat(deploy)` | 8 |
+| 11 | [11 — Frequency calibration](prompts/11_calibration.md) | `fix(frequency)` | 5 |
 
-11 annexes, 8,745 words, covering 144 lines of verbatim prompt.
+12 annexes, 9,540 words, covering 152 lines of verbatim prompt.
 
 ## Findings the model surfaced and a human judged
 

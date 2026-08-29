@@ -39,14 +39,16 @@ export function SensitivityGrid({ grid }: { grid: Grid }) {
         { key: "threshold", label: "Threshold" },
         { key: "window", label: "Session window" },
         { key: "episodes", label: "Episodes", numeric: true },
-        { key: "lambda", label: "λ / year", numeric: true },
+        { key: "detected", label: "detected / yr", numeric: true },
+        { key: "incident", label: "incidents / yr", numeric: true },
         { key: "aal", label: "AAL", numeric: true },
       ]}
       rows={grid.cells.map((cell) => ({
         threshold: cell.severity_threshold,
         window: `${cell.session_window_hours}h`,
         episodes: fullNumber(cell.episodes),
-        lambda: fullNumber(Math.round(cell.lambda_total)),
+        detected: fullNumber(Math.round(cell.lambda_detected)),
+        incident: cell.lambda_incident.toFixed(4),
         aal: fullEur(cell.aal),
       }))}
     >
@@ -108,7 +110,7 @@ export function SensitivityGrid({ grid }: { grid: Grid }) {
                           {compactEur(cell.aal)}
                         </span>
                         <span className="tabular mt-0.5 block text-[11px] opacity-80">
-                          λ {fullNumber(Math.round(cell.lambda_total))}/yr
+                          {fullNumber(Math.round(cell.lambda_detected))} detected/yr
                         </span>
                       </button>
                     </td>

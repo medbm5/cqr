@@ -33,6 +33,7 @@ from risk_engine.ingestion import (
     summarize_telemetry,
 )
 from risk_engine.severity import SeverityModel, fit_severity_model, load_incidents
+from risk_engine.severity.cleaning import Incident
 from risk_engine.simulation import (
     SensitivityGrid,
     SimulationResult,
@@ -104,12 +105,16 @@ class Dataset:
         ingestion: Deduplicated events and the normalization report.
         telemetry: Weekly buckets and severity mix over the window.
         severity: The fitted severity model.
+        incidents: The cleaned external base. Kept because the frequency stage
+            needs it too - to convert detected attacks into loss-generating
+            incidents - not only the severity stage that prices them.
     """
 
     assets: tuple[Asset, ...]
     ingestion: IngestionResult
     telemetry: TelemetrySummary
     severity: SeverityModel
+    incidents: tuple[Incident, ...]
 
 
 def data_dir() -> Path:
@@ -137,6 +142,7 @@ def get_dataset() -> Dataset:
         ingestion=ingestion,
         telemetry=summarize_telemetry(ingestion.events),
         severity=fit_severity_model(incidents, cleaning),
+        incidents=incidents,
     )
 
 
@@ -163,6 +169,10 @@ def get_frequency(
             severity_threshold=severity_threshold, session_gap_hours=session_window_hours
         ),
         normalization=dataset.ingestion.report,
+        # Calibrated here, so the rate the simulation draws from is always the
+        # incident rate and never the detection rate.
+        incidents=dataset.incidents,
+        peer_params=dataset.severity.peer_params,
     )
 
 
@@ -212,6 +222,7 @@ def get_sensitivity(seed: int, n_years: int) -> SensitivityGrid:
         dataset.ingestion.report.window,
         dataset.severity,
         assets=dataset.assets,
+        incidents=dataset.incidents,
         n_years=n_years,
         seed=seed,
         baseline=FrequencyParams(),

@@ -111,6 +111,11 @@ def run_pipeline(
         assets=assets,
     )
 
+    # The incident base is loaded first: frequency needs it to convert detected
+    # attacks into loss-generating incidents, and severity needs it to price them.
+    incidents, cleaning = load_incidents(data_dir / "cyber_incidents.csv")
+    severity = fit_severity_model(incidents, cleaning)
+
     frequency_params = FrequencyParams()
     frequency = estimate_frequency(
         ingestion.events,
@@ -118,10 +123,9 @@ def run_pipeline(
         assets=assets,
         params=frequency_params,
         normalization=ingestion.report,
+        incidents=incidents,
+        peer_params=severity.peer_params,
     )
-
-    incidents, cleaning = load_incidents(data_dir / "cyber_incidents.csv")
-    severity = fit_severity_model(incidents, cleaning)
 
     result = simulate(frequency, severity, n_years=years, seed=seed)
 
@@ -132,6 +136,7 @@ def run_pipeline(
             ingestion.report.window,
             severity,
             assets=assets,
+            incidents=incidents,
             n_years=sensitivity_years,
             seed=seed,
             baseline=frequency_params,
@@ -161,11 +166,29 @@ def run_pipeline(
             "explanation": ingestion.to_explanation(),
         },
         "frequency": {
-            "lambda_total": frequency.lambda_total,
-            "lambda_by_attack_type": {
+            "lambda_detected": frequency.lambda_detected,
+            "lambda_detected_by_attack_type": {
                 attack_type.value: rate
-                for attack_type, rate in frequency.lambda_by_attack_type.items()
+                for attack_type, rate in frequency.lambda_detected_by_attack_type.items()
             },
+            "lambda_incident": frequency.lambda_incident,
+            "lambda_incident_by_attack_type": {
+                attack_type.value: rate
+                for attack_type, rate in (frequency.lambda_incident_by_attack_type or {}).items()
+            },
+            "calibration": (
+                None
+                if frequency.calibration is None
+                else {
+                    "p_materialize": frequency.calibration.p_materialize,
+                    "base_rate_per_company_year": (
+                        frequency.calibration.base_rate.incidents_per_company_year
+                    ),
+                    "peer_companies": frequency.calibration.base_rate.companies,
+                    "peer_incidents": frequency.calibration.base_rate.incidents,
+                    "observed_years": frequency.calibration.base_rate.observed_years,
+                }
+            ),
             "episodes": frequency.episodes,
             "episodes_by_attack_type": {
                 attack_type.value: count
@@ -246,7 +269,8 @@ def run_pipeline(
                     "severity_threshold": cell.severity_threshold.value,
                     "session_window_hours": cell.session_window_hours,
                     "episodes": cell.episodes,
-                    "lambda_total": cell.lambda_total,
+                    "lambda_detected": cell.lambda_detected,
+                    "lambda_incident": cell.lambda_incident,
                     "aal": cell.aal,
                 }
                 for cell in grid.cells

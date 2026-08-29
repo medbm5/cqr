@@ -128,8 +128,19 @@ export interface TelemetryResponse {
 }
 
 export interface FrequencyResponse {
-  lambda_total: number;
-  lambda_by_attack_type: Record<AttackType, number>;
+  /** Detected attack episodes per year. NOT the rate at which losses occur. */
+  lambda_detected: number;
+  lambda_detected_by_attack_type: Record<AttackType, number>;
+  /** Loss-generating incidents per year — what the simulation prices. */
+  lambda_incident: number | null;
+  lambda_incident_by_attack_type: Partial<Record<AttackType, number>> | null;
+  calibration: {
+    p_materialize: number;
+    base_rate_per_company_year: number;
+    peer_companies: number;
+    peer_incidents: number;
+    observed_years: number;
+  } | null;
   episodes: number;
   episodes_by_attack_type: Record<AttackType, number>;
   observed_days: number;
@@ -241,7 +252,8 @@ export interface SimulationResponse {
       severity_threshold: SeverityClass;
       session_window_hours: number;
       episodes: number;
-      lambda_total: number;
+      lambda_detected: number;
+      lambda_incident: number;
       aal: number;
     }[];
     n_years: number;

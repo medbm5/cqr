@@ -36,6 +36,9 @@ def population(attack_type, n, *, mu=11.0, sigma=1.5, sector="Retail", seed=1):
             attack_type=attack_type,
             sector=sector,
             loss=float(rng.lognormal(mean=mu, sigma=sigma)),
+            # Spread across four years, matching the real base's span, so a rate
+            # can be derived from the fixture.
+            day_offset=int(i * 1460 / max(n - 1, 1)),
         )
         for i in range(n)
     ]

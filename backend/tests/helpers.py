@@ -49,9 +49,15 @@ def incident(
     attack_type=None,
     loss=100_000.0,
     employees=1200,
+    day_offset=0,
 ):
-    """Build one cleaned `Incident`, defaulting to an exact peer of the target."""
+    """Build one cleaned `Incident`, defaulting to an exact peer of the target.
+
+    `day_offset` spreads incidents through time. A base where every incident
+    shares one date spans zero years, which no annual rate can be derived from.
+    """
     from datetime import date as _date
+    from datetime import timedelta as _timedelta
 
     from risk_engine.attack_types import AttackType
     from risk_engine.severity.cleaning import Incident
@@ -59,7 +65,7 @@ def incident(
     return Incident(
         incident_id=incident_id,
         company_id="ORG-1",
-        occurred_on=_date(2024, 1, 15),
+        occurred_on=_date(2022, 1, 1) + _timedelta(days=day_offset),
         sector=sector,
         company_size=size,
         employees=employees,

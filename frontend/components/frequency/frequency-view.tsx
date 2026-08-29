@@ -90,8 +90,8 @@ export function FrequencyView({ initial }: { initial: FrequencyBundle }) {
       <section aria-label="Frequency headlines" className="mb-4 grid gap-4 sm:grid-cols-3">
         <StatTile
           index={0}
-          label="Attacks per year"
-          value={frequency.lambda_total}
+          label="Detected attacks per year"
+          value={frequency.lambda_detected}
           format="count"
           caption={`Annualized from ${frequency.observed_days} observed days`}
         />
@@ -104,10 +104,14 @@ export function FrequencyView({ initial }: { initial: FrequencyBundle }) {
         />
         <StatTile
           index={2}
-          label="Attack-grade share"
-          value={frequency.events_attack_grade / frequency.events_total}
-          format="percent"
-          caption={`Of ${fullNumber(frequency.events_total)} distinct events`}
+          label="Loss incidents per year"
+          value={frequency.lambda_incident ?? 0}
+          format="rate"
+          caption={
+            frequency.calibration
+              ? `1 in ${fullNumber(Math.round(1 / frequency.calibration.p_materialize))} detected attacks, anchored on ${fullNumber(frequency.calibration.peer_companies)} peer organisations`
+              : "Not calibrated"
+          }
         />
       </section>
 

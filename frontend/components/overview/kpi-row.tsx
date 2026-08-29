@@ -8,7 +8,8 @@ export interface Headline {
   rawRows: number;
   duplicatesMerged: number;
   dedupRate: number;
-  lambdaTotal: number;
+  lambdaDetected: number;
+  lambdaIncident: number | null;
   episodes: number;
   observedDays: number;
   /** Null while the engine is still computing it, or if that one call failed. */
@@ -44,12 +45,15 @@ export function KpiRow({ headline }: { headline: Headline }) {
           versus: "naive concatenation",
         }}
       />
+      {/* The incident rate, not the detection rate. Detected attacks are what
+          the sensors saw; incidents are what cost money, and only the second is
+          a frequency a loss figure can be built on. */}
       <StatTile
         index={2}
-        label="Attack frequency"
-        value={headline.lambdaTotal}
-        format="perYear"
-        caption={`${fullNumber(headline.episodes)} episodes over ${headline.observedDays} observed days`}
+        label="Loss incidents per year"
+        value={headline.lambdaIncident ?? 0}
+        format="rate"
+        caption={`From ${fullNumber(Math.round(headline.lambdaDetected))} detected attacks/yr, calibrated on the peer base`}
       />
       {headline.loss ? (
         <StatTile

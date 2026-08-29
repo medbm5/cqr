@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from risk_engine.frequency import FrequencyParams, estimate_frequency
 from risk_engine.ingestion import Asset, SecurityEvent, SeverityClass, TimeWindow
 from risk_engine.severity import SeverityModel
+from risk_engine.severity.cleaning import Incident
 
 from .engine import simulate
 
@@ -48,14 +49,16 @@ class SensitivityCell:
         severity_threshold: The attack-grade threshold used.
         session_window_hours: The session gap used.
         episodes: Episodes the frequency stage found under those settings.
-        lambda_total: The annualized attack rate that produced.
+        lambda_detected: Detected attack episodes per year.
+        lambda_incident: Loss-generating incidents per year, after calibration.
         aal: Average annual loss the simulation produced from it.
     """
 
     severity_threshold: SeverityClass
     session_window_hours: float
     episodes: int
-    lambda_total: float
+    lambda_detected: float
+    lambda_incident: float
     aal: float
 
 
@@ -102,13 +105,14 @@ class SensitivityGrid:
             f"1. Re-ran frequency and simulation across "
             f"{len(self.thresholds)}x{len(self.session_windows)} parameter "
             f"combinations, {self.n_years:,} year(s) each, all on seed {self.seed}.",
-            "  threshold  window    episodes   lambda/yr              AAL",
+            "  threshold  window    episodes  detected/yr  incident/yr              AAL",
         ]
         for cell in self.cells:
             marker = "  <- baseline" if cell == self.baseline else ""
             lines.append(
                 f"  {cell.severity_threshold.value:9s} {cell.session_window_hours:>5.0f}h "
-                f"{cell.episodes:>11,} {cell.lambda_total:>11,.1f} "
+                f"{cell.episodes:>11,} {cell.lambda_detected:>12,.1f} "
+                f"{cell.lambda_incident:>12.4f} "
                 f"EUR {cell.aal:>16,.0f}{marker}"
             )
 
@@ -127,6 +131,7 @@ def sensitivity_grid(
     severity: SeverityModel,
     *,
     assets: Sequence[Asset] = (),
+    incidents: Sequence[Incident] = (),
     thresholds: Sequence[SeverityClass] = DEFAULT_THRESHOLDS,
     session_windows: Sequence[float] = DEFAULT_SESSION_WINDOWS,
     n_years: int = DEFAULT_SENSITIVITY_YEARS,
@@ -143,6 +148,8 @@ def sensitivity_grid(
         window: The observation window.
         severity: The fitted severity model, shared across cells.
         assets: Asset reference, passed through to the frequency stage.
+        incidents: The external incident base, so each cell is calibrated the
+            same way the headline run is.
         thresholds: Severity thresholds to sweep.
         session_windows: Session gaps to sweep, in hours.
         n_years: Years to simulate per cell.
@@ -159,14 +166,17 @@ def sensitivity_grid(
     for threshold in thresholds:
         for session_window in session_windows:
             params = FrequencyParams(severity_threshold=threshold, session_gap_hours=session_window)
-            estimate = estimate_frequency(events, window, assets=assets, params=params)
+            estimate = estimate_frequency(
+                events, window, assets=assets, params=params, incidents=incidents
+            )
             result = simulate(estimate, severity, n_years=n_years, seed=seed)
 
             cell = SensitivityCell(
                 severity_threshold=threshold,
                 session_window_hours=session_window,
                 episodes=estimate.episodes,
-                lambda_total=estimate.lambda_total,
+                lambda_detected=estimate.lambda_detected,
+                lambda_incident=estimate.lambda_incident or 0.0,
                 aal=result.metrics.aal,
             )
             cells.append(cell)

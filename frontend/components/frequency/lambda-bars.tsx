@@ -51,7 +51,7 @@ export function LambdaBars({
   frequency: FrequencyResponse;
   dimmed?: boolean;
 }) {
-  const data = (Object.entries(frequency.lambda_by_attack_type) as [AttackType, number][])
+  const data = (Object.entries(frequency.lambda_detected_by_attack_type) as [AttackType, number][])
     .map(([attackType, rate]) => ({
       attackType,
       label: LABELS[attackType] ?? attackType,
@@ -63,8 +63,12 @@ export function LambdaBars({
 
   return (
     <ChartFrame
-      title="Annual attack rate by type"
-      hint={`${fullNumber(frequency.episodes)} episodes over ${frequency.observed_days} days, annualized`}
+      title="Detected attacks per year, by type"
+      hint={
+        frequency.lambda_incident === null
+          ? `${fullNumber(frequency.episodes)} episodes over ${frequency.observed_days} days, annualized`
+          : `${fullNumber(frequency.episodes)} episodes over ${frequency.observed_days} days. These are detections — ${frequency.lambda_incident.toFixed(2)} of them per year become a loss.`
+      }
       dimmed={dimmed}
       columns={[
         { key: "label", label: "Attack type" },

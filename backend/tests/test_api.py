@@ -77,13 +77,21 @@ def test_assets_echoes_the_conventions_it_used(client, dataset):
     }
 
 
-def test_a_stricter_threshold_finds_fewer_episodes(client, dataset):
-    lenient = client.get("/api/assets/?severity_threshold=medium").json()
-    strict = client.get("/api/assets/?severity_threshold=critical").json()
+def test_a_stricter_threshold_admits_fewer_attack_grade_events(client, dataset):
+    """Stricter means fewer *events*. Episode counts are not monotone.
 
-    assert sum(a["episodes"] for a in strict["assets"]) < sum(
-        a["episodes"] for a in lenient["assets"]
-    )
+    Under asset-only clustering a looser threshold admits more events, which
+    chain into longer episodes - so lowering the threshold can *reduce* the
+    episode count while raising the event count. Asserting on episodes would
+    encode an intuition the model does not have.
+    """
+    lenient = client.get("/api/frequency/?severity_threshold=medium").json()
+    strict = client.get("/api/frequency/?severity_threshold=critical").json()
+
+    assert strict["events_attack_grade"] < lenient["events_attack_grade"]
+    # Whichever way the episode count moves, the incident rate is anchored
+    # externally and does not move with the threshold at all.
+    assert strict["lambda_incident"] == pytest.approx(lenient["lambda_incident"])
 
 
 # ------------------------------------------------------------------ telemetry
@@ -133,14 +141,24 @@ def test_frequency_returns_rates_and_the_trace(client, dataset):
     body = response.json()
     engine = pipeline.get_frequency(pipeline.DEFAULT_THRESHOLD, pipeline.DEFAULT_WINDOW_HOURS)
 
-    assert body["lambda_total"] == pytest.approx(engine.lambda_total)
+    assert body["lambda_detected"] == pytest.approx(engine.lambda_detected)
+    # The rate the simulation prices is the *incident* rate, not the detection
+    # rate, and the API must expose both so the two are never confused.
+    assert body["lambda_incident"] == pytest.approx(engine.lambda_incident)
+    assert body["lambda_incident"] < body["lambda_detected"]
+    assert body["calibration"]["p_materialize"] > 0
     assert body["episodes"] == engine.episodes
     assert body["observed_days"] == engine.observed_days
     assert body["params"] == {"severity_threshold": "high", "session_window_hours": 24.0}
     assert body["explanation"]
     # Every attack type is present, including those the telemetry cannot observe.
-    assert body["lambda_by_attack_type"]["supply_chain"] == 0.0
-    assert sum(body["lambda_by_attack_type"].values()) == pytest.approx(body["lambda_total"])
+    assert body["lambda_detected_by_attack_type"]["supply_chain"] == 0.0
+    assert sum(body["lambda_detected_by_attack_type"].values()) == pytest.approx(
+        body["lambda_detected"]
+    )
+    assert sum(body["lambda_incident_by_attack_type"].values()) == pytest.approx(
+        body["lambda_incident"]
+    )
 
 
 def test_frequency_honours_the_query_parameters(client, dataset):
@@ -148,6 +166,9 @@ def test_frequency_honours_the_query_parameters(client, dataset):
     narrow = client.get("/api/frequency/?session_window_hours=8").json()
 
     assert wide["episodes"] < narrow["episodes"]
+    # The incident rate is anchored externally, so widening the window changes
+    # how many attacks were detected, not how often losses occur.
+    assert wide["lambda_incident"] == pytest.approx(narrow["lambda_incident"])
     assert wide["params"]["session_window_hours"] == 72.0
 
 

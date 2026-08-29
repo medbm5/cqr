@@ -56,7 +56,7 @@ def test_annualization_scales_episodes_by_the_observed_window():
 
     assert estimate.episodes == 2
     assert estimate.observed_days == 100
-    assert estimate.lambda_total == pytest.approx(2 / 100 * 365)
+    assert estimate.lambda_detected == pytest.approx(2 / 100 * 365)
 
 
 def test_a_shorter_window_yields_a_higher_rate_for_the_same_episodes():
@@ -65,13 +65,13 @@ def test_a_shorter_window_yields_a_higher_rate_for_the_same_episodes():
     short = estimate_frequency(events, window(50))
     long = estimate_frequency(events, window(200))
 
-    assert short.lambda_total == pytest.approx(4 * long.lambda_total)
+    assert short.lambda_detected == pytest.approx(4 * long.lambda_detected)
 
 
 def test_a_full_year_of_observation_leaves_the_count_unchanged():
     estimate = estimate_frequency([event(0)], window(365))
 
-    assert estimate.lambda_total == pytest.approx(1.0)
+    assert estimate.lambda_detected == pytest.approx(1.0)
 
 
 def test_a_window_of_no_days_is_rejected():
@@ -84,16 +84,18 @@ def test_per_type_rates_sum_to_the_total():
 
     estimate = estimate_frequency(events, window(100))
 
-    assert sum(estimate.lambda_by_attack_type.values()) == pytest.approx(estimate.lambda_total)
+    assert sum(estimate.lambda_detected_by_attack_type.values()) == pytest.approx(
+        estimate.lambda_detected
+    )
     assert sum(estimate.episodes_by_attack_type.values()) == estimate.episodes
 
 
 def test_every_attack_type_appears_even_at_zero():
     estimate = estimate_frequency([event(0, technique="T1486")], window(100))
 
-    assert set(estimate.lambda_by_attack_type) == set(AttackType)
-    assert estimate.lambda_by_attack_type[AttackType.SUPPLY_CHAIN] == 0.0
-    assert estimate.lambda_by_attack_type[AttackType.RANSOMWARE] > 0.0
+    assert set(estimate.lambda_detected_by_attack_type) == set(AttackType)
+    assert estimate.lambda_detected_by_attack_type[AttackType.SUPPLY_CHAIN] == 0.0
+    assert estimate.lambda_detected_by_attack_type[AttackType.RANSOMWARE] > 0.0
 
 
 def test_unmapped_techniques_are_counted_as_other_and_reported():
@@ -130,9 +132,10 @@ def test_other_is_fully_explained_by_its_two_causes():
     # every event that landed in "other".
     other_events = estimate.events_without_technique + sum(estimate.unmapped_techniques.values())
     assert other_events == 2
-    # Those two events are on one asset an hour apart, so they are one attack.
-    assert estimate.episodes_by_attack_type[AttackType.OTHER] == 1
-    assert estimate.episodes_by_attack_type[AttackType.RANSOMWARE] == 1
+    # All three are on one asset within two hours, so they are one attack,
+    # labelled by its worst event. The "other" accounting is about events, not
+    # episodes, and stays exact regardless of how they cluster.
+    assert estimate.episodes == 1
 
 
 # ------------------------------------------------------------------------- accounting
@@ -233,7 +236,7 @@ def test_explanation_traces_events_through_to_lambda():
     assert "Started from 4 unique event(s)." in text
     assert "no severity grade" in text
     assert "attack-grade event(s)" in text
-    assert "Clustered them into 2 episode(s)" in text
+    assert "Clustered them into 1 episode(s)" in text
     assert "/ 100 day(s) x 365" in text
     assert "T9999" in text
     assert "not observable from SIEM/EDR telemetry" in text
@@ -258,5 +261,5 @@ def test_explanation_starts_at_raw_rows_when_given_the_ingestion_report(siem_csv
 def test_explanation_handles_an_estimate_with_no_events():
     estimate = estimate_frequency([], window(10))
 
-    assert estimate.lambda_total == 0.0
+    assert estimate.lambda_detected == 0.0
     assert "Kept 0 attack-grade event(s)." in "\n".join(estimate.to_explanation())

@@ -9,31 +9,50 @@ to its inputs**: each stage of the model returns a `to_explanation()` that
 renders the numbered chain from raw CSV rows to euros, and that same chain is
 what the CLI prints, what the API serves, and what the web UI displays.
 
-## The headline, and its caveat
+## The headline
 
 ```
-AAL       EUR 12,471,807,357        VaR 99   EUR 22,987,482,942
-median    EUR 11,867,291,411        TVaR 99  EUR 32,388,088,830
-                                    100,000 simulated years, seed 42
+AAL          EUR   438,038        VaR 95   EUR     816,323
+median year  EUR         0        VaR 99   EUR   6,665,810
+P(no loss)        73.7%           TVaR 99  EUR  31,567,672
+                                 100,000 simulated years, seed 42
 ```
 
-**That figure is arithmetically correct and indefensible as a risk estimate**, and
-the engine says so on its own trace. It follows from an attack frequency of
-**9,168 per year** — roughly 25 successful attacks a day on a 20-asset estate —
-which is what the supplied telemetry implies once 31.5% of its events are graded
-high or critical.
+Three years in four cost nothing; the average year costs €438k because roughly
+one year in twenty is expensive and one in a hundred is severe. That shape —
+mostly quiet, occasionally ruinous — is what a cyber loss distribution looks
+like, and reproducing it is the point.
 
-A subtler consequence matters more than the inflation: at that rate the annual
-total is nearly deterministic. The AAL sits only **1.1× the median year**, no year
-in 100,000 is loss-free, and VaR 99 is under 2× the AAL. The central limit theorem
-flattens 9,168 draws a year into a near-Gaussian aggregate, so the implausible
-frequency does not merely inflate the answer — **it removes the shape** the
-exercise exists to show.
+**The number rests on one conversion that is worth understanding before trusting
+it.** The telemetry counts *detected attacks*: 911 episodes over 212 days, or
+1,568 per year. The incident base prices *losses*. Those are different units, and
+multiplying one by the other prices every alert as a breach — which is how an
+earlier version of this engine produced an annual loss of €12.5 billion for a
+1,200-employee company.
 
-The built-in sensitivity grid spans a factor of **7.2** across every defensible
-setting of the two frequency conventions, and no cell rescues the figure. That is
-itself the finding: the problem is the input telemetry's severity distribution,
-not a parameter choice. See `prompts/05_simulation.md` for the full argument.
+The bridge is calibrated, not assumed:
+
+```
+1,568.5 detected attacks/yr  x  p_materialize 1.95e-04  =  0.3052 loss incidents/yr
+                                                           ^
+              anchored on 1,600 incidents at 1,310 peer organisations over 3.99 years,
+              weighted by the same sector/size/maturity kernel the severity model uses
+```
+
+The consequence, stated plainly: **the incident rate is now set entirely by the
+peer base, and the telemetry contributes only the attack-type mix.** Changing the
+severity threshold or the session window moves the detected rate thirty-fold and
+leaves the loss rate untouched. That is deliberate and it is a limitation —
+`next_steps.md` item 1 is the credibility blend that would give this company's own
+evidence back some weight.
+
+Two other things a reader should know:
+
+- **`data_breach` drives 61% of the AAL** on 19% of the episodes, because its
+  fitted mean loss is €4.8M against a €571k pooled mean. The answer is sensitive
+  to the technique-to-attack-type mapping in a way the headline does not show.
+- **The Pareto diagnostic says five of eight tails are understated**, so VaR 99
+  and TVaR 99 should be read as lower bounds.
 
 ## Architecture
 
@@ -253,17 +272,24 @@ number.
   *pooled* lognormal is nonetheless rejected by KS, because the base is a mixture
   of five severity strata — hence one fit per attack type, each shipping its KS
   statistic, QQ points and a Pareto tail fitted as a rival. *(notebook §7)*
+- **Detected attacks ≠ loss incidents** — the telemetry counts detections, the
+  incident base prices losses, and multiplying the two directly is a category
+  error. A fitted `p_materialize` bridges them, anchored on the peer-weighted
+  base rate of 0.3052 incidents per organisation-year. *(`prompts/11_calibration.md`)*
 - **Monte Carlo aggregation** — frequency and severity compound rather than
-  multiply: each simulated year draws a Poisson count per attack type and a loss
-  per incident, then sums. Vectorized across blocks of years, every draw seeded,
-  and `TVaR ≥ VaR` asserted as an invariant. *(`prompts/05_simulation.md`)*
+  multiply: each simulated year draws a Poisson count per attack type from the
+  *incident* rate and a loss per incident, then sums. Vectorized across blocks of
+  years, every draw seeded, and `TVaR ≥ VaR` asserted as an invariant.
+  *(`prompts/05_simulation.md`)*
 
 ## Known limitations
 
-Beyond the frequency problem above:
-
 - **The Pareto rival beats the lognormal on five of eight tails**, twice with
   α < 1. The lognormal likely understates the extremes VaR and TVaR are made of.
+- **`p_materialize` is one fitted scalar** absorbing sensor noise, control
+  quality and response speed. It is the single most influential number in the
+  pipeline and has no structure — see `next_steps.md` item 2.
+- **The telemetry no longer affects how often losses occur**, only what kind.
 - **`supply_chain` and `insider_error` get λ = 0.** No ATT&CK technique in either
   feed corresponds to them, though the incident base holds 78 and 129 such
   incidents. The zero means *unobservable from this telemetry*, not *no risk*, and

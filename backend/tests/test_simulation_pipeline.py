@@ -43,11 +43,19 @@ def severity():
     return fit_severity_model(population(AttackType.RANSOMWARE, 200), cleaning_report())
 
 
+@pytest.fixture
+def incidents():
+    """A synthetic base to calibrate against, so each grid cell has an incident rate."""
+    return population(AttackType.RANSOMWARE, 200)
+
+
 # ------------------------------------------------------------- sensitivity
 
 
-def test_the_grid_covers_every_combination(telemetry, severity):
-    grid = sensitivity_grid(telemetry, window(30), severity, n_years=200, seed=1)
+def test_the_grid_covers_every_combination(telemetry, severity, incidents):
+    grid = sensitivity_grid(
+        telemetry, window(30), severity, incidents=incidents, n_years=200, seed=1
+    )
 
     assert len(grid.cells) == 9
     assert len(grid.thresholds) == 3
@@ -55,38 +63,46 @@ def test_the_grid_covers_every_combination(telemetry, severity):
     assert len({(c.severity_threshold, c.session_window_hours) for c in grid.cells}) == 9
 
 
-def test_a_looser_threshold_admits_more_attacks(telemetry, severity):
-    grid = sensitivity_grid(telemetry, window(30), severity, n_years=200, seed=1)
+def test_a_looser_threshold_admits_more_attacks(telemetry, severity, incidents):
+    grid = sensitivity_grid(
+        telemetry, window(30), severity, incidents=incidents, n_years=200, seed=1
+    )
     by_threshold = {
         threshold: [c for c in grid.cells if c.severity_threshold is threshold]
         for threshold in grid.thresholds
     }
 
-    medium = max(c.lambda_total for c in by_threshold[SeverityClass.MEDIUM])
-    critical = max(c.lambda_total for c in by_threshold[SeverityClass.CRITICAL])
+    medium = max(c.lambda_detected for c in by_threshold[SeverityClass.MEDIUM])
+    critical = max(c.lambda_detected for c in by_threshold[SeverityClass.CRITICAL])
     assert medium > critical
 
 
-def test_a_wider_session_window_merges_more_episodes(telemetry, severity):
-    grid = sensitivity_grid(telemetry, window(30), severity, n_years=200, seed=1)
+def test_a_wider_session_window_merges_more_episodes(telemetry, severity, incidents):
+    grid = sensitivity_grid(
+        telemetry, window(30), severity, incidents=incidents, n_years=200, seed=1
+    )
     high = [c for c in grid.cells if c.severity_threshold is SeverityClass.HIGH]
     by_window = {c.session_window_hours: c.episodes for c in high}
 
     assert by_window[72.0] <= by_window[24.0] <= by_window[8.0]
 
 
-def test_the_grid_reports_the_spread_it_found(telemetry, severity):
-    grid = sensitivity_grid(telemetry, window(30), severity, n_years=200, seed=1)
+def test_the_grid_reports_the_spread_it_found(telemetry, severity, incidents):
+    grid = sensitivity_grid(
+        telemetry, window(30), severity, incidents=incidents, n_years=200, seed=1
+    )
 
     low, high = grid.aal_range
     assert low <= high
     assert grid.spread_factor == pytest.approx(high / low)
 
 
-def test_the_baseline_cell_is_marked_when_the_sweep_covers_it(telemetry, severity):
+def test_the_baseline_cell_is_marked_when_the_sweep_covers_it(telemetry, severity, incidents):
     baseline = FrequencyParams(severity_threshold=SeverityClass.HIGH, session_gap_hours=24.0)
 
-    grid = sensitivity_grid(telemetry, window(30), severity, n_years=200, seed=1, baseline=baseline)
+    grid = sensitivity_grid(
+        telemetry, window(30), severity, incidents=incidents, n_years=200, seed=1, baseline=baseline
+    )
 
     assert grid.baseline is not None
     assert grid.baseline.severity_threshold is SeverityClass.HIGH
@@ -94,16 +110,20 @@ def test_the_baseline_cell_is_marked_when_the_sweep_covers_it(telemetry, severit
     assert "<- baseline" in "\n".join(grid.to_explanation())
 
 
-def test_the_baseline_is_absent_when_the_sweep_misses_it(telemetry, severity):
+def test_the_baseline_is_absent_when_the_sweep_misses_it(telemetry, severity, incidents):
     baseline = FrequencyParams(severity_threshold=SeverityClass.HIGH, session_gap_hours=999.0)
 
-    grid = sensitivity_grid(telemetry, window(30), severity, n_years=200, seed=1, baseline=baseline)
+    grid = sensitivity_grid(
+        telemetry, window(30), severity, incidents=incidents, n_years=200, seed=1, baseline=baseline
+    )
 
     assert grid.baseline is None
 
 
-def test_the_grid_explains_itself(telemetry, severity):
-    grid = sensitivity_grid(telemetry, window(30), severity, n_years=200, seed=1)
+def test_the_grid_explains_itself(telemetry, severity, incidents):
+    grid = sensitivity_grid(
+        telemetry, window(30), severity, incidents=incidents, n_years=200, seed=1
+    )
     text = "\n".join(grid.to_explanation())
 
     assert "3x3 parameter combinations" in text
@@ -111,12 +131,12 @@ def test_the_grid_explains_itself(telemetry, severity):
     assert "AAL spans EUR" in text
 
 
-def test_spread_factor_is_infinite_when_a_cell_produces_no_loss(severity):
+def test_spread_factor_is_infinite_when_a_cell_produces_no_loss(severity, incidents):
     # Only Critical events, so the Critical-threshold cells find attacks and the
     # others find none: one end of the range is zero.
     quiet = [event(0, severity=SeverityClass.LOW)]
 
-    grid = sensitivity_grid(quiet, window(30), severity, n_years=100, seed=1)
+    grid = sensitivity_grid(quiet, window(30), severity, incidents=incidents, n_years=100, seed=1)
 
     assert grid.aal_range == (0.0, 0.0)
     assert grid.spread_factor == float("inf")
@@ -163,7 +183,11 @@ def test_the_cli_runs_the_whole_pipeline_into_one_document(tmp_path, fixtures_di
         assert document[stage]["explanation"]
 
     assert document["ingestion"]["events_in_both_feeds"] == 12343
-    assert document["frequency"]["lambda_total"] > 0
+    assert document["frequency"]["lambda_detected"] > 0
+    # The results file must carry both rates and the bridge between them, or a
+    # reader cannot tell which one the AAL was priced from.
+    assert 0 < document["frequency"]["lambda_incident"] < document["frequency"]["lambda_detected"]
+    assert document["frequency"]["calibration"]["p_materialize"] > 0
     assert document["severity"]["incidents_fitted"] == 1598
     assert document["simulation"]["metrics"]["aal_eur"] > 0
     assert (

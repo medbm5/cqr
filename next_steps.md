@@ -11,10 +11,13 @@ most interesting to write.
 
 ## 1. Gamma-Poisson credibility: blend telemetry with base rates
 
-**The problem it fixes.** The single biggest defect in this deliverable. The
-telemetry implies λ ≈ 9,168 attacks/year on a 20-asset estate, which is not a
-plausible rate for any real company. The engine currently trusts the telemetry
-completely, because it has nothing else to trust.
+**The problem it fixes.** The engine no longer trusts the telemetry's magnitude
+at all — it anchors the incident rate entirely on the peer base (0.3052 per
+organisation-year) and lets the telemetry supply only the attack-type mix. That
+is safe, but it is the opposite extreme: seven months of this company's own
+telemetry now carries **zero** weight in how often losses happen. An estate that
+genuinely is attacked twice as often as its peers would be priced identically to
+one that is not.
 
 **What it would look like.** Treat the per-attack-type rate as
 `λ ~ Gamma(α, β)` with the prior set from the incident base — the observed
@@ -27,19 +30,62 @@ telemetry episodes. The posterior mean is then a credibility-weighted blend:
 ```
 
 with `Z` rising as the observation window lengthens. Seven months of telemetry
-would carry real but not total weight, and the estimate would stop being
-hostage to one estate's detection verbosity.
+would then carry real but not total weight — a middle ground between the old
+model, which trusted it completely, and the current one, which does not trust it
+at all.
 
-**Why it wasn't done.** It is a genuine modeling addition rather than a
-refinement, and it needs a defensible prior — deriving incident *rates* from an
-incident *base* means assuming an exposure denominator the data does not
-contain. Doing it badly would replace an obviously wrong number with a
-plausible-looking wrong number, which is worse. This is the first thing I would
-build next.
+**Why it wasn't done.** The blend needs a credible `k` — how many
+organisation-years of telemetry are worth one organisation-year of base rate —
+and nothing in the data pins it. Choosing one by feel would quietly decide how
+much this company's own evidence counts, which is exactly the judgment the
+credibility framework exists to make explicit. This is still the first thing I
+would build next.
 
 ---
 
-## 2. GPD tail via peaks-over-threshold
+## 2. Model `p_materialize` instead of fitting one scalar
+
+**What it fixes.** The frequency stage now converts detected attacks into
+loss-generating incidents through a single fitted number:
+`lambda_incident = lambda_detected x p_materialize`, with `p_materialize`
+calibrated so the result matches the peer base rate. On the case data that is
+1.95e-4 — one detected attack in 5,100 becomes a loss.
+
+That scalar carries a lot of weight for something with no structure. It absorbs,
+in one number, how noisy this estate's sensors are, how good its controls are,
+and how quickly it responds. Worse, because the anchor is external, **the
+telemetry no longer influences how often losses happen at all** — it only decides
+the attack-type *mix*. Changing the severity threshold or the session window
+moves `lambda_detected` by a factor of thirty and leaves `lambda_incident`
+exactly where it was.
+
+**What it would look like.** Split it the way FAIR does:
+
+```
+p_materialize = p_control_failure(maturity) x p_impact_given_failure(asset, attack_type)
+```
+
+with the maturity term calibrated by regressing incident frequency on
+`security_maturity_score` across the base, controlling for size and sector. Then
+a company with maturity 75 would show a genuinely lower incident rate than one at
+35, which the current construction cannot express — both would inherit the same
+peer-weighted anchor.
+
+**Why it was not done.** The regression needs an exposure denominator the base
+does not contain: it records incidents, not organisation-years at risk, so a
+low-maturity company appearing three times could be badly defended or simply
+unlucky. Fitting a maturity curve on that would produce a confident-looking
+coefficient with no support. The single scalar is the honest version — it is
+visibly one number doing one job, rather than a model implying knowledge that is
+not there.
+
+**Related, and cheaper:** report the *sensitivity of the answer to
+`p_materialize`* explicitly, since it is now the single most influential number
+in the pipeline and currently appears only as a line in the trace.
+
+---
+
+## 3. GPD tail via peaks-over-threshold
 
 **The problem it fixes.** The severity stage already reports that a Pareto tail
 describes the extremes better than the fitted lognormal on **five of eight**
@@ -61,7 +107,7 @@ in my head.
 
 ---
 
-## 3. Dependence between attack types (copulas)
+## 4. Dependence between attack types (copulas)
 
 **The problem it fixes.** The simulation draws each attack type's Poisson count
 independently. Real campaigns do not work that way: a phishing wave lands
@@ -74,14 +120,15 @@ draws, with the correlation matrix estimated from co-occurrence of attack types
 within the same `company_id` in the incident base — several organisations appear
 more than once, which is exactly the signal needed.
 
-**Why it wasn't done.** At λ ≈ 9,168 the aggregate is already nearly
-deterministic, so correlation would barely move the current number. This becomes
-worth doing *after* item 1, not before — it is a refinement to a frequency that
-is currently wrong by orders of magnitude.
+**Why it wasn't done.** Scope. Note that calibration *raised* its value: at
+λ_incident ≈ 0.31 the annual total is dominated by whether an incident happens at
+all, so correlation between types now shapes the tail materially — where at the
+old λ ≈ 9,168 the aggregate was so smooth that dependence barely registered.
+This has moved up the list.
 
 ---
 
-## 4. Control effectiveness and a FAIR-style maturity adjustment
+## 5. Control effectiveness and a FAIR-style maturity adjustment
 
 **The problem it fixes.** Maturity 55/100 currently affects only *which peers are
 weighted*, through the Gaussian kernel. It does not affect the company's own
@@ -103,7 +150,7 @@ Getting this right needs care about what each data source already encodes.
 
 ---
 
-## 5. Asset-level loss allocation by criticality
+## 6. Asset-level loss allocation by criticality
 
 **The problem it fixes.** The output is one number for the whole company. The
 question a CISO actually asks is "which assets carry it", and the engine already
@@ -124,7 +171,7 @@ supply this. It needs an external source or an explicit, labelled assumption.
 
 ---
 
-## 6. Backtesting against the incident base
+## 7. Backtesting against the incident base
 
 **The problem it fixes.** Nothing currently validates the model's output against
 observed reality. Every check in the suite is internal consistency.
@@ -144,7 +191,7 @@ each held-out organisation's losses from its own peer group.
 
 ---
 
-## 7. Threat-intelligence enrichment
+## 8. Threat-intelligence enrichment
 
 **What it would look like.** Join the observed ATT&CK techniques to campaign and
 actor data — which actors use T1486, which sectors they target — to adjust
@@ -158,7 +205,7 @@ flagged as `ARGUABLE` in four places.
 
 ---
 
-## 8. CI pipeline
+## 9. CI pipeline
 
 **What it would look like.** GitHub Actions running `make lint test` on push, a
 matrix over Python 3.11–3.13, the notebook executed with `nbconvert` to catch
@@ -171,7 +218,7 @@ themselves exist and run.
 
 ---
 
-## 9. Authentication on the API
+## 10. Authentication on the API
 
 **What it would look like.** The API is `AllowAny` and read-only, which is right
 for a local case study and wrong for anything else. Token or session auth on the

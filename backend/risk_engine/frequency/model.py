@@ -8,8 +8,11 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 from risk_engine.ingestion import Asset, NormalizationReport, SecurityEvent, TimeWindow
+from risk_engine.severity.cleaning import Incident
+from risk_engine.severity.peers import PeerWeightParams
 
 from .attack_types import UNOBSERVABLE_ATTACK_TYPES, AttackType, attack_type_for
+from .calibration import Calibration, calibrate, peer_weighted_base_rate
 from .episodes import (
     DAYS_PER_YEAR,
     Episode,
@@ -56,10 +59,19 @@ class FrequencyEstimate:
     from in the simulation stage.
 
     Attributes:
-        lambda_total: Annualized rate across all attack types.
-        lambda_by_attack_type: Annualized rate per attack type. Every type is
-            present, including those with a rate of zero, so an absent risk is
-            visible rather than missing.
+        lambda_detected: Annualized *detected attack episodes*, across all
+            types. This is what the telemetry saw, not what it cost - almost
+            every detected attack is stopped, noise, or one step of a chain that
+            never completes.
+        lambda_detected_by_attack_type: The same, per attack type.
+        calibration: The bridge to loss-generating incidents, or `None` when no
+            incident base was supplied to anchor against.
+        lambda_incident: Annualized *loss-generating incidents* - the rate the
+            simulation draws from, because it is the unit the severity model
+            prices. `None` until calibrated.
+        lambda_incident_by_attack_type: The incident rate split by the attack-type
+            mix the telemetry observed. The telemetry cannot say how often losses
+            occur, but it is the best evidence for *which kind* they are.
         episodes: Episodes observed over the window.
         episodes_by_attack_type: Episode counts behind each rate.
         observed_days: Length of the observation window, in calendar days.
@@ -79,8 +91,8 @@ class FrequencyEstimate:
             start from raw CSV rows rather than from already-merged events.
     """
 
-    lambda_total: float
-    lambda_by_attack_type: Mapping[AttackType, float]
+    lambda_detected: float
+    lambda_detected_by_attack_type: Mapping[AttackType, float]
     episodes: int
     episodes_by_attack_type: Mapping[AttackType, int]
     observed_days: int
@@ -94,6 +106,27 @@ class FrequencyEstimate:
     events_without_technique: int = 0
     unmapped_techniques: Mapping[str, int] = field(default_factory=dict)
     normalization: NormalizationReport | None = None
+    calibration: Calibration | None = None
+
+    @property
+    def lambda_incident(self) -> float | None:
+        """Loss-generating incidents per year, or `None` if uncalibrated."""
+        return None if self.calibration is None else self.calibration.lambda_incident
+
+    @property
+    def lambda_incident_by_attack_type(self) -> Mapping[AttackType, float] | None:
+        """The incident rate split by the observed attack-type mix.
+
+        The mix is the telemetry's contribution: it cannot say how often a loss
+        happens, but it is the best available evidence for what kind it would be.
+        """
+        if self.calibration is None or self.episodes == 0:
+            return None
+        rate = self.calibration.lambda_incident
+        return {
+            attack_type: rate * count / self.episodes
+            for attack_type, count in self.episodes_by_attack_type.items()
+        }
 
     @property
     def episodes_by_criticality(self) -> Mapping[int, int]:
@@ -167,10 +200,10 @@ class FrequencyEstimate:
         lines.append(
             f"Annualized over the observed window: {self.episodes:,} / "
             f"{self.observed_days} day(s) x {DAYS_PER_YEAR:g} = "
-            f"{self.lambda_total:,.1f} attack(s) per year."
+            f"{self.lambda_detected:,.1f} DETECTED attack(s) per year."
         )
         for attack_type, rate in sorted(
-            self.lambda_by_attack_type.items(), key=lambda item: -item[1]
+            self.lambda_detected_by_attack_type.items(), key=lambda item: -item[1]
         ):
             count = self.episodes_by_attack_type.get(attack_type, 0)
             note = ""
@@ -178,6 +211,42 @@ class FrequencyEstimate:
                 note = "  <- not observable from SIEM/EDR telemetry, not absent risk"
             lines.append(
                 f"  {attack_type.value:18s} {count:>6,} episode(s)  lambda = {rate:>9,.1f}/yr{note}"
+            )
+
+        if self.calibration is not None:
+            base = self.calibration.base_rate
+            lines.append(
+                f"Detected attacks are not losses. Calibrated against the external "
+                f"base: {base.incidents:,} incident(s) at {base.companies:,} "
+                f"organisation(s) over {base.observed_years:.2f} years, peer-weighted "
+                f"to this company's profile, gives "
+                f"{base.incidents_per_company_year:.4f} loss incident(s) per "
+                f"organisation-year."
+            )
+            lines.append(
+                f"  {self.lambda_detected:,.1f} detected episodes/yr x "
+                f"p_materialize = {self.calibration.p_materialize:.2e} -> "
+                f"{self.calibration.lambda_incident:.4f} loss incident(s)/yr."
+            )
+            lines.append(
+                "  p_materialize is fitted, not assumed: it is whatever makes this "
+                "estate's detection rate agree with what comparable organisations "
+                "actually lose. A very small value says the sensors are noisy, not "
+                "that the company is safe."
+            )
+            incident_mix = self.lambda_incident_by_attack_type or {}
+            for attack_type, rate in sorted(incident_mix.items(), key=lambda item: -item[1]):
+                if rate <= 0.0:
+                    continue
+                lines.append(
+                    f"    {attack_type.value:18s} {rate:8.5f} incident(s)/yr  "
+                    f"({self.episodes_by_attack_type.get(attack_type, 0):,} of "
+                    f"{self.episodes:,} episodes)"
+                )
+        else:
+            lines.append(
+                "No incident base supplied, so the estimate stops at detected attacks. "
+                "Pricing these directly would treat every detection as a breach."
             )
 
         if self.events_without_technique:
@@ -218,6 +287,8 @@ def estimate_frequency(
     assets: Sequence[Asset] = (),
     params: FrequencyParams | None = None,
     normalization: NormalizationReport | None = None,
+    incidents: Sequence[Incident] = (),
+    peer_params: PeerWeightParams | None = None,
 ) -> FrequencyEstimate:
     """Estimate annualized attack frequency from normalized telemetry.
 
@@ -237,6 +308,12 @@ def estimate_frequency(
             `FrequencyParams()` - attack-grade at `high`, 24-hour gap.
         normalization: The ingestion report, so the trace can begin at raw CSV
             rows. Optional.
+        incidents: The external incident base. Supplying it calibrates detected
+            attacks into loss-generating incidents, which is the rate the
+            simulation needs; without it the estimate stops at what was detected.
+        peer_params: The target profile the base rate is weighted against. The
+            same one the severity model uses, so both halves describe the same
+            company.
 
     Returns:
         The estimate, its per-attack-type segmentation and its audit trail.
@@ -265,9 +342,19 @@ def estimate_frequency(
     episodes_by_type = {attack_type: counts.get(attack_type, 0) for attack_type in AttackType}
     lambda_by_type = {attack_type: count * scale for attack_type, count in episodes_by_type.items()}
 
+    lambda_detected = len(episodes) * scale
+    calibration: Calibration | None = None
+    if incidents and lambda_detected > 0.0:
+        calibration = calibrate(
+            lambda_detected,
+            peer_weighted_base_rate(
+                incidents, peer_params if peer_params is not None else PeerWeightParams()
+            ),
+        )
+
     return FrequencyEstimate(
-        lambda_total=len(episodes) * scale,
-        lambda_by_attack_type=lambda_by_type,
+        lambda_detected=lambda_detected,
+        lambda_detected_by_attack_type=lambda_by_type,
         episodes=len(episodes),
         episodes_by_attack_type=episodes_by_type,
         observed_days=window.observed_days,
@@ -283,6 +370,7 @@ def estimate_frequency(
         ),
         unmapped_techniques=dict(unmapped),
         normalization=normalization,
+        calibration=calibration,
     )
 
 

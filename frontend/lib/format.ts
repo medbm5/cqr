@@ -67,7 +67,7 @@ export function perYear(value: number): string {
  * React cannot serialize a function across that boundary. The server names the
  * format; the client resolves it.
  */
-export type FormatKind = "count" | "fullCount" | "eur" | "percent" | "perYear";
+export type FormatKind = "count" | "fullCount" | "eur" | "percent" | "perYear" | "rate";
 
 export const FORMATTERS: Record<FormatKind, (value: number) => string> = {
   count: compactNumber,
@@ -75,4 +75,6 @@ export const FORMATTERS: Record<FormatKind, (value: number) => string> = {
   eur: compactEur,
   percent: (value) => percent(value),
   perYear,
+  // A rate below one needs its decimals: 0.31/yr rounds to "0/yr" otherwise.
+  rate: (value) => `${value.toFixed(2)}/yr`,
 };

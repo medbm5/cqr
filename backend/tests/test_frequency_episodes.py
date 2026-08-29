@@ -66,18 +66,21 @@ def test_assets_are_sessionized_independently():
     assert {episode.asset_id for episode in episodes} == {"asset-1", "asset-2"}
 
 
-def test_concurrent_attack_types_on_one_asset_are_separate_episodes():
-    # A ransomware detection and a DDoS detection an hour apart are two attacks,
-    # not one: the episode key is (asset, attack_type).
+def test_concurrent_attack_types_on_one_asset_are_one_episode():
+    """One asset, one window, one episode - whatever mix of types fires.
+
+    This asserted the opposite until the clustering key was corrected. Keying on
+    (asset, attack_type) counted one intrusion once per type it tripped, which
+    is the detection stream re-counted under another name. The episode is
+    labelled by its worst event.
+    """
     events = [event(0, technique="T1486"), event(1, technique="T1498")]
 
     episodes = sessionize(events, params=FrequencyParams())
 
-    assert len(episodes) == 2
-    assert {episode.attack_type for episode in episodes} == {
-        AttackType.RANSOMWARE,
-        AttackType.DDOS,
-    }
+    assert len(episodes) == 1
+    assert episodes[0].event_count == 2
+    assert episodes[0].attack_type in {AttackType.RANSOMWARE, AttackType.DDOS}
 
 
 def test_techniques_of_the_same_attack_type_share_an_episode():

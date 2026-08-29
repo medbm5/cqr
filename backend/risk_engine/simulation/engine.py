@@ -178,17 +178,26 @@ class SimulationResult:
             f"loss per incident."
         )
 
+        calibration = self.frequency.calibration
         lines.append(
-            f"Frequency: {self.frequency.lambda_total:,.1f} attack(s) per year in total, "
-            f"from {self.frequency.episodes:,} episode(s) over "
+            f"Frequency: {self.frequency.lambda_detected:,.1f} DETECTED attack(s) per "
+            f"year, from {self.frequency.episodes:,} episode(s) over "
             f"{self.frequency.observed_days} observed day(s)."
         )
+        if calibration is not None:
+            lines.append(
+                f"  Calibrated to {calibration.lambda_incident:.4f} LOSS INCIDENT(s) per "
+                f"year (p_materialize = {calibration.p_materialize:.2e}), anchored on "
+                f"{calibration.base_rate.companies:,} peer organisation(s). The "
+                f"simulation draws from this, not from the detection rate."
+            )
         lines.append("Severity: a lognormal per attack type, fitted on peer-weighted incidents.")
         lines.append("Per attack type, the inputs and what they contributed:")
         # Sorting the mapping's items rather than the enum itself: iterating a
         # StrEnum through sorted() widens the member type back to str.
         for attack_type, rate in sorted(
-            self.frequency.lambda_by_attack_type.items(), key=lambda item: item[0].value
+            (self.frequency.lambda_incident_by_attack_type or {}).items(),
+            key=lambda item: item[0].value,
         ):
             if rate <= 0.0:
                 continue
@@ -196,7 +205,7 @@ class SimulationResult:
             contribution = self.expected_loss_by_type.get(attack_type, 0.0)
             share = contribution / metrics.aal if metrics.aal > 0 else 0.0
             lines.append(
-                f"  {attack_type.value:18s} lambda={rate:>8,.1f}/yr  "
+                f"  {attack_type.value:18s} lambda={rate:>9,.5f}/yr  "
                 f"mu={fit.params.mu:6.3f} sigma={fit.params.sigma:5.3f} "
                 f"(mean EUR {fit.params.mean_eur:>12,.0f})  "
                 f"-> EUR {contribution:>16,.0f}/yr, {share:5.1%} of AAL"
@@ -275,19 +284,32 @@ def simulate(
         The simulated distribution, its metrics and both exceedance curves.
 
     Raises:
-        ValueError: If `n_years` is not positive, or `draws_per_block` is not
-            positive.
+        ValueError: If `n_years` is not positive, if `draws_per_block` is not
+            positive, or if the frequency estimate has not been calibrated into
+            incident rates.
     """
     if n_years <= 0:
         raise ValueError(f"n_years must be positive, got {n_years}")
     if draws_per_block <= 0:
         raise ValueError(f"draws_per_block must be positive, got {draws_per_block}")
 
-    rates = {
-        attack_type: rate
-        for attack_type, rate in frequency.lambda_by_attack_type.items()
-        if rate > 0.0
-    }
+    # The *incident* rate, never the detection rate. The severity model prices
+    # incidents that produced a loss, so drawing Poisson counts from detected
+    # episodes would price every alert as a breach - a category error worth
+    # failing loudly on rather than silently computing.
+    incident_rates = frequency.lambda_incident_by_attack_type
+    if incident_rates is None and frequency.episodes == 0:
+        # Nothing was detected, so nothing materialises. A legitimate zero, not
+        # a missing calibration - the distinction matters because one is an
+        # answer and the other is a bug.
+        incident_rates = {}
+    if incident_rates is None:
+        raise ValueError(
+            "frequency estimate is uncalibrated: it reports detected attacks, not "
+            "loss-generating incidents. Pass the incident base to estimate_frequency() "
+            "so the two can be reconciled before they are multiplied."
+        )
+    rates = {attack_type: rate for attack_type, rate in incident_rates.items() if rate > 0.0}
     params_by_type: dict[AttackType, LognormalParams] = {
         attack_type: severity.fits[attack_type].params for attack_type in rates
     }

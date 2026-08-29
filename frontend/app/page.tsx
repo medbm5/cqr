@@ -43,7 +43,8 @@ async function loadHeadline(): Promise<Headline | { error: string }> {
     rawRows: report.rows_read,
     duplicatesMerged: report.duplicates_merged,
     dedupRate: report.duplicates_merged / report.rows_read,
-    lambdaTotal: frequency.value.lambda_total,
+    lambdaDetected: frequency.value.lambda_detected,
+    lambdaIncident: frequency.value.lambda_incident,
     episodes: frequency.value.episodes,
     observedDays: frequency.value.observed_days,
     loss:

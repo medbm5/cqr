@@ -109,16 +109,20 @@ def is_attack_grade(event: SecurityEvent, threshold: SeverityClass) -> bool:
 def sessionize(events: Sequence[SecurityEvent], *, params: FrequencyParams) -> tuple[Episode, ...]:
     """Group attack-grade events into episodes.
 
-    Events are bucketed by `(asset_id, attack_type)` and then split wherever the
-    gap between consecutive events exceeds `params.session_gap_hours`.
+    Events are bucketed by `asset_id` and then split wherever the gap between
+    consecutive events exceeds `params.session_gap_hours`.
 
-    Keying on the attack type as well as the asset - rather than on the asset
-    alone - means two campaigns of different types running against one machine on
-    the same day are counted as two attacks, not one. It also removes the need
-    for a rule that picks a single attack type for a mixed episode, which would
-    otherwise decide, arbitrarily, which of two concurrent attacks gets priced.
-    On the case data the two readings differ by a factor of 5.7 in the total
-    rate, so the choice is recorded here rather than left implicit.
+    **One asset, one time window, one episode** - even when five techniques fire.
+    An intruder on a machine trips whatever detections that machine has; treating
+    each technique or each attack type as its own attack counts the *detections*
+    again under a different name, which is the thing episodes exist to stop.
+    Keying on `(asset, attack_type)` instead compresses only 1.9x on the case
+    data against 10.9x for the asset alone, and the difference is not two
+    campaigns - it is one campaign seen through several rules.
+
+    A mixed episode is labelled by its **worst** event's attack type, ties broken
+    by the earliest occurrence. The worst detection is the best available guess
+    at what the intrusion actually was, and it is the one a defender would name.
 
     Events with no `asset_id` are excluded: an attack that cannot be attributed
     to a machine cannot be clustered per machine. They are counted by the caller.
@@ -131,22 +135,25 @@ def sessionize(events: Sequence[SecurityEvent], *, params: FrequencyParams) -> t
         Episodes sorted by start time, then asset, then attack type - so the
         output does not depend on the order events arrived in.
     """
-    buckets: dict[tuple[str, AttackType], list[SecurityEvent]] = defaultdict(list)
+    buckets: dict[str, list[SecurityEvent]] = defaultdict(list)
     for event in events:
         if event.asset_id is None or not is_attack_grade(event, params.severity_threshold):
             continue
-        buckets[(event.asset_id, attack_type_for(event.technique))].append(event)
+        buckets[event.asset_id].append(event)
 
     episodes: list[Episode] = []
-    for (asset_id, attack_type), bucket in buckets.items():
+    for asset_id, bucket in buckets.items():
         bucket.sort(key=lambda event: (event.observed_at, event.event_id))
         run: list[SecurityEvent] = [bucket[0]]
         for previous, current in pairwise(bucket):
+            # Rolling: the gap is measured against the previous event in the run,
+            # not the run's first, so a chain of short gaps stays one episode
+            # however long it runs in total.
             if current.observed_at - previous.observed_at > params.session_gap:
-                episodes.append(_close(asset_id, attack_type, run))
+                episodes.append(_close(asset_id, run))
                 run = []
             run.append(current)
-        episodes.append(_close(asset_id, attack_type, run))
+        episodes.append(_close(asset_id, run))
 
     return tuple(
         sorted(
@@ -156,12 +163,20 @@ def sessionize(events: Sequence[SecurityEvent], *, params: FrequencyParams) -> t
     )
 
 
-def _close(asset_id: str, attack_type: AttackType, run: list[SecurityEvent]) -> Episode:
-    """Build an episode from a completed run of events."""
+def _close(asset_id: str, run: list[SecurityEvent]) -> Episode:
+    """Build an episode from a completed run of events.
+
+    The episode's attack type is the one carried by its worst event - ties going
+    to whichever happened first, so the label never depends on iteration order.
+    """
     severities = [event.severity_class for event in run if event.severity_class is not None]
+    worst = max(
+        enumerate(run),
+        key=lambda pair: (pair[1].severity_class.rank if pair[1].severity_class else -1, -pair[0]),
+    )[1]
     return Episode(
         asset_id=asset_id,
-        attack_type=attack_type,
+        attack_type=attack_type_for(worst.technique),
         started_at=run[0].observed_at,
         ended_at=run[-1].observed_at,
         event_count=len(run),

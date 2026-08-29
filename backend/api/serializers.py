@@ -163,8 +163,16 @@ class TelemetryResponseSerializer(serializers.Serializer):
 class FrequencyResponseSerializer(ExplanationMixin):
     """Annualized attack rates, segmented by type."""
 
-    lambda_total = serializers.FloatField()
-    lambda_by_attack_type = serializers.SerializerMethodField()
+    lambda_detected = serializers.FloatField(
+        help_text="Detected attack episodes per year. NOT the rate losses occur at."
+    )
+    lambda_detected_by_attack_type = serializers.SerializerMethodField()
+    lambda_incident = serializers.FloatField(
+        allow_null=True,
+        help_text="Loss-generating incidents per year. This is what the simulation draws from.",
+    )
+    lambda_incident_by_attack_type = serializers.SerializerMethodField()
+    calibration = serializers.SerializerMethodField()
     episodes = serializers.IntegerField()
     episodes_by_attack_type = serializers.SerializerMethodField()
     observed_days = serializers.IntegerField()
@@ -179,9 +187,27 @@ class FrequencyResponseSerializer(ExplanationMixin):
     events_without_asset = serializers.IntegerField()
     events_without_technique = serializers.IntegerField()
 
-    def get_lambda_by_attack_type(self, obj: Any) -> dict[str, float]:
-        """Annual rate per attack type, every type present."""
-        return _by_value(dict(obj.lambda_by_attack_type))
+    def get_lambda_detected_by_attack_type(self, obj: Any) -> dict[str, float]:
+        """Detected episodes per year, per attack type."""
+        return _by_value(dict(obj.lambda_detected_by_attack_type))
+
+    def get_lambda_incident_by_attack_type(self, obj: Any) -> dict[str, float] | None:
+        """Incident rate per attack type, or null when uncalibrated."""
+        mix = obj.lambda_incident_by_attack_type
+        return None if mix is None else _by_value(dict(mix))
+
+    def get_calibration(self, obj: Any) -> dict[str, Any] | None:
+        """How detected attacks were converted into loss-generating incidents."""
+        calibration = obj.calibration
+        if calibration is None:
+            return None
+        return {
+            "p_materialize": calibration.p_materialize,
+            "base_rate_per_company_year": calibration.base_rate.incidents_per_company_year,
+            "peer_companies": calibration.base_rate.companies,
+            "peer_incidents": calibration.base_rate.incidents,
+            "observed_years": calibration.base_rate.observed_years,
+        }
 
     def get_episodes_by_attack_type(self, obj: Any) -> dict[str, int]:
         """Episode count per attack type."""
@@ -368,7 +394,8 @@ class SensitivityCellSerializer(serializers.Serializer):
     severity_threshold = serializers.SerializerMethodField()
     session_window_hours = serializers.FloatField()
     episodes = serializers.IntegerField()
-    lambda_total = serializers.FloatField()
+    lambda_detected = serializers.FloatField()
+    lambda_incident = serializers.FloatField()
     aal = serializers.FloatField()
 
     def get_severity_threshold(self, obj: Any) -> str:

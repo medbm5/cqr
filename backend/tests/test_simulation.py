@@ -9,6 +9,7 @@ from test_severity_model import cleaning_report
 
 from risk_engine.attack_types import AttackType
 from risk_engine.frequency import FrequencyEstimate, FrequencyParams
+from risk_engine.frequency.calibration import BaseRate, Calibration
 from risk_engine.severity import (
     LognormalParams,
     PeerWeightParams,
@@ -62,15 +63,36 @@ def constant_severity(loss_eur, *, attack_type=AttackType.RANSOMWARE):
 
 
 def frequency_of(rate, *, attack_type=AttackType.RANSOMWARE, days=365):
-    """A frequency estimate with a single non-zero rate."""
+    """A calibrated frequency estimate with a single non-zero incident rate.
+
+    The simulation draws from `lambda_incident_by_attack_type`, so the test
+    fixture has to be calibrated: an uncalibrated estimate is refused, which is
+    the behaviour that stops detected attacks being priced as losses.
+    """
     rates = dict.fromkeys(AttackType, 0.0)
     rates[attack_type] = rate
     counts = dict.fromkeys(AttackType, 0)
-    counts[attack_type] = int(rate)
+    counts[attack_type] = 1
+    base = BaseRate(
+        incidents_per_company_year=rate,
+        weighted_incidents=1.0,
+        weighted_companies=1.0,
+        companies=1,
+        incidents=1,
+        observed_years=1.0,
+    )
     return FrequencyEstimate(
-        lambda_total=rate,
-        lambda_by_attack_type=rates,
-        episodes=int(rate),
+        lambda_detected=max(rate, 1e-9),
+        lambda_detected_by_attack_type=rates,
+        calibration=Calibration(
+            lambda_detected=max(rate, 1e-9),
+            lambda_incident=rate,
+            p_materialize=1.0,
+            base_rate=base,
+        ),
+        # One episode of the chosen type: the mix is a share of episodes, so a
+        # zero episode count would leave the incident rate unattributable.
+        episodes=1,
         episodes_by_attack_type=counts,
         observed_days=days,
         window=window(days),
@@ -119,11 +141,20 @@ def test_rates_from_several_attack_types_add_up():
     rates = dict.fromkeys(AttackType, 0.0)
     rates[AttackType.RANSOMWARE] = 2.0
     rates[AttackType.PHISHING] = 3.0
+    counts = dict.fromkeys(AttackType, 0)
+    counts[AttackType.RANSOMWARE] = 2
+    counts[AttackType.PHISHING] = 3
     frequency = FrequencyEstimate(
-        lambda_total=5.0,
-        lambda_by_attack_type=rates,
+        lambda_detected=5.0,
+        lambda_detected_by_attack_type=rates,
+        calibration=Calibration(
+            lambda_detected=5.0,
+            lambda_incident=5.0,
+            p_materialize=1.0,
+            base_rate=BaseRate(5.0, 1.0, 1.0, 1, 1, 1.0),
+        ),
         episodes=5,
-        episodes_by_attack_type=dict.fromkeys(AttackType, 0),
+        episodes_by_attack_type=counts,
         observed_days=365,
         window=window(365),
         params=FrequencyParams(),
@@ -329,7 +360,8 @@ def test_explanation_traces_lambda_and_sigma_through_to_the_metrics():
     text = "\n".join(lines)
 
     assert "Simulated 20,000 independent year(s) from seed 42" in text
-    assert "attack(s) per year in total" in text
+    assert "DETECTED attack(s) per year" in text
+    assert "LOSS INCIDENT(s) per year" in text
     assert "lambda=" in text and "sigma=" in text
     assert "AAL (mean)" in text
     assert "VaR 95" in text and "TVaR 99" in text
