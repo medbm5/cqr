@@ -52,9 +52,15 @@ USER appuser
 
 EXPOSE 8000
 
-# `PORT` is what Render, Fly and Cloud Run all inject. Two workers is what a
-# small instance affords: each holds its own memoized dataset, so a third would
-# cost another copy of the fitted model for no extra throughput on a read-mostly
-# API. The timeout is generous because a 200,000-year simulation is a legitimate
+# `PORT` is what Render, Fly and Cloud Run all inject.
+#
+# **One worker by default.** Each worker holds its own copy of the loaded
+# dataset and fitted severity model - roughly 200 MB - so two of them plus a
+# simulation's working arrays do not fit in the 512 MB a free instance gets.
+# Two workers OOM-killed the process within seconds of the first request; one
+# runs comfortably. Raise `WEB_CONCURRENCY` on an instance with the memory for
+# it; no rebuild needed.
+#
+# The timeout is generous because a 200,000-year simulation is a legitimate
 # request that takes half a minute.
-CMD ["sh", "-c", "gunicorn api.wsgi:application --bind 0.0.0.0:${PORT} --workers 2 --timeout 120 --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "gunicorn api.wsgi:application --bind 0.0.0.0:${PORT} --workers ${WEB_CONCURRENCY:-1} --timeout 120 --access-logfile - --error-logfile -"]

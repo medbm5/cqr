@@ -48,7 +48,18 @@ DEFAULT_N_YEARS = 100_000
 #: this estate produces. Years are therefore processed in blocks sized so that
 #: roughly this many draws are live at a time - a loop over a handful of blocks
 #: rather than over a hundred thousand years.
-DRAWS_PER_BLOCK = 20_000_000
+#:
+#: A block costs **two** arrays of this length: the losses (float64) and the
+#: year index each belongs to (int64). At 2,000,000 that is about 31 MB, which
+#: fits comfortably inside a 512 MB container alongside the loaded dataset and
+#: the fitted model. It was 20,000,000 - roughly 305 MB per block - which ran
+#: fine on a workstation and OOM-killed the worker on a free-tier instance
+#: within seconds of the first request.
+#:
+#: Raising it trades memory for a little speed. Note that changing it changes
+#: the *sequence* of random draws, so two runs with the same seed but different
+#: block sizes agree statistically rather than exactly.
+DRAWS_PER_BLOCK = 2_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,10 +69,12 @@ class SimulationParams:
     Attributes:
         n_years: Simulated years.
         seed: Seed for every draw. The whole run is reproducible from it.
-        draws_per_block: Memory budget, in individual loss draws. Affects speed
-            and peak memory, never the result: the block boundaries are derived
-            deterministically from the inputs, so the same seed and the same
-            frequency and severity models always produce the same years.
+        draws_per_block: Memory budget, in individual loss draws. A block holds
+            two arrays of this length, so peak memory is about 16 bytes times
+            this number. Reproducibility is exact for a *fixed* value - the same
+            seed and inputs always give the same years - but changing it changes
+            the order draws are taken in, so results across different block
+            sizes agree statistically rather than to the last euro.
     """
 
     n_years: int
@@ -328,8 +341,8 @@ def _blocks(n_years: int, expected_per_year: float, draws_per_block: int) -> lis
     """Split the years into blocks small enough to hold in memory.
 
     The split depends only on the arguments, never on the machine, so a run is
-    reproducible across environments: the same seed sees the same sequence of
-    draws regardless of how much memory happens to be free.
+    reproducible across environments: for a given `draws_per_block`, the same
+    seed sees the same sequence of draws no matter how much memory is free.
     """
     if expected_per_year <= 0.0:
         return [(0, n_years)]

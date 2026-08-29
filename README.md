@@ -178,6 +178,16 @@ Two things reduce the damage, and neither eliminates it:
 the free tier, not the engine. A paid instance that never sleeps removes it
 entirely; so does any always-on host.
 
+### Memory on a 512 MB instance
+
+The image runs **one gunicorn worker** by default. Each worker holds its own copy
+of the loaded dataset and fitted model — around 200 MB — so two of them plus a
+simulation's working arrays do not fit in the 512 MB a free instance gets. Two
+workers OOM-kill the process within seconds of the first `POST /api/simulate/`.
+
+Raise `WEB_CONCURRENCY` on an instance with the memory for it; no rebuild needed.
+Measured on a 512 MB container: 138 MB idle, 152 MB after a 200,000-year run.
+
 The simulation endpoint is capped at **200,000 years** and defaults to 25,000
 precisely because one caller should not be able to occupy a worker indefinitely
 on an instance this small.

@@ -116,7 +116,7 @@ def get_dataset() -> Dataset:
     )
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=8)
 def get_frequency(
     severity_threshold: SeverityClass,
     session_window_hours: float,
@@ -142,7 +142,10 @@ def get_frequency(
     )
 
 
-@lru_cache(maxsize=16)
+# Each entry retains two float64 arrays of n_years, so at the 200,000-year cap
+# four entries is about 13 MB. Sixteen was 51 MB of results nobody had asked
+# for twice.
+@lru_cache(maxsize=4)
 def get_simulation(
     n_years: int,
     seed: int,
