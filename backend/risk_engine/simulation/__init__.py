@@ -34,6 +34,7 @@ from .metrics import (
     ExceedanceCurve,
     LossMetrics,
     exceedance_curve,
+    log_spaced_probabilities,
     summarize,
 )
 from .sensitivity import (
@@ -59,6 +60,7 @@ __all__ = [
     "SimulationParams",
     "SimulationResult",
     "exceedance_curve",
+    "log_spaced_probabilities",
     "sensitivity_grid",
     "simulate",
     "summarize",

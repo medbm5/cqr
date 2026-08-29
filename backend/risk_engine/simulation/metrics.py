@@ -95,6 +95,38 @@ class ExceedanceCurve:
     return_period_years: tuple[float, ...]
 
 
+def log_spaced_probabilities(points: int, *, finest: float) -> tuple[float, ...]:
+    """Exceedance probabilities spaced evenly on a log scale.
+
+    A dense curve for plotting. Log spacing puts as many points across the rare
+    tail as across the common body, which is where an exceedance curve carries
+    its information - linear spacing would spend nearly every point between a
+    1-in-2 and a 1-in-3 year.
+
+    Args:
+        points: How many probabilities to return.
+        finest: The rarest probability to include, normally `1 / n_years`.
+
+    Returns:
+        Probabilities descending from 0.5 to `finest`.
+
+    Raises:
+        ValueError: If `points` is below 2, or `finest` is outside (0, 0.5].
+    """
+    if points < 2:
+        raise ValueError(f"points must be at least 2, got {points}")
+    if not 0.0 < finest <= 0.5:
+        raise ValueError(f"finest must be in (0, 0.5], got {finest}")
+
+    exponents = np.linspace(np.log10(0.5), np.log10(finest), points)
+    values = np.power(10.0, exponents)
+    # Pin the endpoints: raising 10 to a rounded logarithm lands a hair either
+    # side of the target, and a `finest` a hair too small is dropped by
+    # `exceedance_curve` as unresolvable, silently costing the last point.
+    values[0], values[-1] = 0.5, finest
+    return tuple(float(value) for value in values)
+
+
 def summarize(annual_losses: Floats) -> LossMetrics:
     """Reduce a simulated loss distribution to its headline metrics.
 

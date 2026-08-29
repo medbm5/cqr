@@ -15,10 +15,11 @@ from risk_engine.severity import (
     SeverityFit,
     SeverityModel,
 )
-from risk_engine.severity.fitting import FitDiagnostics
+from risk_engine.severity.fitting import DistributionPlot, FitDiagnostics
 from risk_engine.simulation import (
     ExceedanceCurve,
     exceedance_curve,
+    log_spaced_probabilities,
     simulate,
     summarize,
 )
@@ -39,6 +40,7 @@ def constant_severity(loss_eur, *, attack_type=AttackType.RANSOMWARE):
         qq_theoretical=(),
         qq_empirical=(),
         tail=None,
+        plot=DistributionPlot(bin_edges_log=(), bin_density=(), curve_x_log=(), curve_y=()),
     )
     fit = SeverityFit(
         attack_type=attack_type,
@@ -365,3 +367,30 @@ def test_a_block_with_no_incidents_at_all_is_skipped():
 def test_building_a_curve_from_zero_years_is_rejected():
     with pytest.raises(ValueError, match="zero simulated years"):
         exceedance_curve(np.array([]), kind="aep")
+
+
+def test_a_curve_can_be_re_read_at_a_finer_resolution():
+    result = simulate(frequency_of(3.0), constant_severity(1000.0), n_years=20_000, seed=11)
+
+    dense = result.curve("aep", points=200)
+
+    assert len(dense.loss_eur) == 200
+    assert list(dense.exceedance_probability) == sorted(dense.exceedance_probability, reverse=True)
+    assert list(dense.loss_eur) == sorted(dense.loss_eur)
+    assert result.curve("oep", points=50).kind == "oep"
+
+
+def test_re_reading_a_curve_rejects_an_unknown_kind():
+    result = simulate(frequency_of(1.0), constant_severity(100.0), n_years=500, seed=0)
+
+    with pytest.raises(ValueError, match="must be 'aep' or 'oep'"):
+        result.curve("annual", points=10)
+
+
+@pytest.mark.parametrize(
+    ("points", "finest", "match"),
+    [(1, 0.001, "at least 2"), (10, 0.0, "finest must be in"), (10, 0.9, "finest must be in")],
+)
+def test_log_spaced_probabilities_reject_impossible_requests(points, finest, match):
+    with pytest.raises(ValueError, match=match):
+        log_spaced_probabilities(points, finest=finest)

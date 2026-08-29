@@ -24,7 +24,13 @@ from risk_engine.attack_types import AttackType
 from risk_engine.frequency import FrequencyEstimate
 from risk_engine.severity import LognormalParams, SeverityModel
 
-from .metrics import ExceedanceCurve, LossMetrics, exceedance_curve, summarize
+from .metrics import (
+    ExceedanceCurve,
+    LossMetrics,
+    exceedance_curve,
+    log_spaced_probabilities,
+    summarize,
+)
 
 Floats = npt.NDArray[np.float64]
 
@@ -70,8 +76,11 @@ class SimulationResult:
         metrics: Headline figures of the annual total.
         aep: Aggregate exceedance curve - the annual *total*.
         oep: Occurrence exceedance curve - the largest *single* loss in a year.
-        annual_losses: Total loss per simulated year, ascending. Kept so the
-            frontend can draw a histogram without re-running anything.
+        annual_losses: Total loss per simulated year, ascending. Kept so a
+            histogram - or a curve at a different resolution - can be drawn
+            without re-running anything.
+        annual_maxima: Largest single loss per simulated year, ascending. The
+            OEP curve is read off this, at whatever resolution is asked for.
         expected_incidents_by_type: Mean incidents per year, per attack type -
             the Poisson rates the years were drawn from.
         expected_loss_by_type: Mean annual loss attributable to each attack type.
@@ -86,11 +95,39 @@ class SimulationResult:
     aep: ExceedanceCurve
     oep: ExceedanceCurve
     annual_losses: Floats
+    annual_maxima: Floats
     expected_incidents_by_type: Mapping[AttackType, float]
     expected_loss_by_type: Mapping[AttackType, float]
     params: SimulationParams
     frequency: FrequencyEstimate
     severity: SeverityModel
+
+    def curve(self, kind: str, *, points: int) -> ExceedanceCurve:
+        """Re-read an exceedance curve at a chosen resolution.
+
+        The curves on this object are evaluated at a short list of round
+        probabilities, which reads well in a table. A chart wants far more
+        points, and re-deriving them from the stored per-year series costs a
+        quantile call rather than another simulation.
+
+        Args:
+            kind: `"aep"` for the annual total, `"oep"` for the annual largest.
+            points: How many points to evaluate, spaced on a log scale.
+
+        Returns:
+            The curve, limited to probabilities the run can actually resolve.
+
+        Raises:
+            ValueError: If `kind` is not aep or oep, or `points` is below 2.
+        """
+        series = {"aep": self.annual_losses, "oep": self.annual_maxima}.get(kind)
+        if series is None:
+            raise ValueError(f"kind must be 'aep' or 'oep', got {kind!r}")
+        return exceedance_curve(
+            series,
+            kind=kind,
+            probabilities=log_spaced_probabilities(points, finest=1.0 / series.size),
+        )
 
     def to_explanation(self) -> list[str]:
         """Render the whole chain, from lambda and sigma through to the metrics."""
@@ -249,6 +286,7 @@ def simulate(
         aep=exceedance_curve(annual_losses, kind="aep"),
         oep=exceedance_curve(annual_maxima, kind="oep"),
         annual_losses=np.sort(annual_losses),
+        annual_maxima=np.sort(annual_maxima),
         expected_incidents_by_type={
             attack_type: total / n_years for attack_type, total in incidents_by_type.items()
         },

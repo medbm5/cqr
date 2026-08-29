@@ -33,10 +33,12 @@ from .cleaning import (
     repair_mojibake,
 )
 from .fitting import (
+    DistributionPlot,
     FitDiagnostics,
     LognormalParams,
     ParetoTail,
     diagnose,
+    distribution_plot,
     fit_lognormal,
     fit_pareto_tail,
     qq_points,
@@ -64,6 +66,7 @@ __all__ = [
     "MISSING_LOSS_SENTINEL",
     "SECTOR_MOJIBAKE",
     "CleaningReport",
+    "DistributionPlot",
     "FitDiagnostics",
     "Incident",
     "LognormalParams",
@@ -73,6 +76,7 @@ __all__ = [
     "SeverityFit",
     "SeverityModel",
     "diagnose",
+    "distribution_plot",
     "effective_sample_size",
     "fit_lognormal",
     "fit_pareto_tail",

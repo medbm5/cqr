@@ -96,6 +96,30 @@ class ParetoTail:
 
 
 @dataclass(frozen=True, slots=True)
+class DistributionPlot:
+    """Observed losses against the fitted density, ready to draw.
+
+    Everything is on the log scale, because that is the only scale on which a
+    heavy-tailed loss distribution is legible: on a linear axis 99% of the mass
+    sits in the first pixel.
+
+    Attributes:
+        bin_edges_log: Histogram edges, in `ln(EUR)`.
+        bin_density: Weighted density in each bin, integrating to 1 over the
+            bin widths. Weighted, so the bars show the *peer* distribution the
+            fit was made on rather than the raw base.
+        curve_x_log: Evenly spaced `ln(EUR)` values spanning the same range.
+        curve_y: The fitted normal density at those points. A fit that describes
+            the data traces the tops of the bars.
+    """
+
+    bin_edges_log: tuple[float, ...]
+    bin_density: tuple[float, ...]
+    curve_x_log: tuple[float, ...]
+    curve_y: tuple[float, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class FitDiagnostics:
     """Evidence for and against one fitted distribution.
 
@@ -111,6 +135,8 @@ class FitDiagnostics:
         qq_empirical: Observed quantiles of `ln(loss)`, aligned with the above.
         tail: The Pareto rival fitted to the upper tail, when enough
             observations exist above the threshold.
+        plot: Histogram and fitted density, for the chart that lets a reader
+            judge the fit by eye rather than by a statistic.
     """
 
     observations: int
@@ -119,6 +145,7 @@ class FitDiagnostics:
     qq_theoretical: tuple[float, ...]
     qq_empirical: tuple[float, ...]
     tail: ParetoTail | None
+    plot: DistributionPlot
 
 
 def fit_lognormal(losses: Floats, weights: Floats) -> LognormalParams:
@@ -306,6 +333,40 @@ def fit_pareto_tail(
     )
 
 
+def distribution_plot(
+    losses: Floats,
+    weights: Floats,
+    params: LognormalParams,
+    *,
+    bins: int = 30,
+    points: int = 120,
+) -> DistributionPlot:
+    """Build the weighted histogram and fitted density for one distribution.
+
+    Args:
+        losses: Positive losses.
+        weights: Non-negative weights aligned with `losses`.
+        params: The fitted distribution.
+        bins: Histogram bins across the observed range.
+        points: Points to evaluate the fitted density at.
+
+    Returns:
+        Parallel arrays for a chart, all on the `ln(EUR)` scale.
+    """
+    log_losses = np.log(losses)
+    density, edges = np.histogram(log_losses, bins=bins, weights=weights, density=True)
+    grid = np.linspace(float(edges[0]), float(edges[-1]), points)
+    curve = np.exp(-0.5 * ((grid - params.mu) / params.sigma) ** 2) / (
+        params.sigma * math.sqrt(2.0 * math.pi)
+    )
+    return DistributionPlot(
+        bin_edges_log=tuple(edges.tolist()),
+        bin_density=tuple(density.tolist()),
+        curve_x_log=tuple(grid.tolist()),
+        curve_y=tuple(curve.tolist()),
+    )
+
+
 def diagnose(
     losses: Floats, weights: Floats, params: LognormalParams, effective_n: float
 ) -> FitDiagnostics:
@@ -318,6 +379,7 @@ def diagnose(
         qq_theoretical=theoretical,
         qq_empirical=empirical,
         tail=fit_pareto_tail(losses, weights, params),
+        plot=distribution_plot(losses, weights, params),
     )
 
 

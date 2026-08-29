@@ -5,12 +5,17 @@ Environment-specific values (secrets, hosts, CORS origins, debug) live in
 without a safe default, so that `dev` stays runnable out of the box.
 """
 
+import os
 from pathlib import Path
 
 # backend/api/settings/base.py -> backend/
 BASE_DIR = Path(__file__).resolve().parents[2]
 # The repository root, where the read-only `data/` directory lives.
 REPO_ROOT = BASE_DIR.parent
+
+# Where the engine reads its four input CSVs from. Overridable so a deployment
+# can mount the dataset elsewhere, and so tests can point at fixtures.
+RISK_ENGINE_DATA_DIR = Path(os.environ.get("RISK_ENGINE_DATA_DIR", REPO_ROOT / "data"))
 
 INSTALLED_APPS = [
     "django.contrib.admin",

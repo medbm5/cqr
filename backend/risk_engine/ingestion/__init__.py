@@ -43,6 +43,11 @@ from .scales import (
     severity_from_edr_risk,
     severity_from_siem_label,
 )
+from .summary import (
+    TelemetrySummary,
+    WeeklyBucket,
+    summarize_telemetry,
+)
 
 __all__ = [
     "EDR_CUT_POINTS",
@@ -58,7 +63,9 @@ __all__ = [
     "SecurityEvent",
     "SeverityClass",
     "Source",
+    "TelemetrySummary",
     "TimeWindow",
+    "WeeklyBucket",
     "as_utc",
     "load_assets",
     "load_edr",
@@ -67,4 +74,5 @@ __all__ = [
     "observed_window",
     "severity_from_edr_risk",
     "severity_from_siem_label",
+    "summarize_telemetry",
 ]
