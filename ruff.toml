@@ -1,0 +1,12 @@
+# Repo-root ruff config.
+#
+# `backend/pyproject.toml` holds the real settings; anything Python outside
+# backend/ - the repo tooling in scripts/ - inherits them from here rather than
+# silently falling back to ruff's defaults, which would format it to a different
+# line length than the rest of the codebase.
+extend = "backend/pyproject.toml"
+
+[lint.per-file-ignores]
+# Repo tooling, not the graded package: docstrings are still required, but these
+# scripts print to stdout by design.
+"scripts/*" = ["T201"]
