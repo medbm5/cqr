@@ -1,0 +1,47 @@
+# Local parity with the deployed pair: the API on :8000, the cockpit on :3000.
+#
+#   docker compose up --build
+#
+# The two are deployed separately in production - the API as a container on
+# Render, the frontend on Vercel - so this file exists to reproduce the pair on
+# one machine, not to describe the production topology.
+
+name: citalid-risk-engine
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DJANGO_SETTINGS_MODULE: api.settings.prod
+      # Local only. The deployed service generates its own.
+      SECRET_KEY: ${SECRET_KEY:-local-compose-only-not-a-secret}
+      DEBUG: "0"
+      ALLOWED_HOSTS: localhost,127.0.0.1,api
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      # Terminate TLS at a proxy in a real deployment; this pair speaks plain HTTP.
+      SECURE_SSL_REDIRECT: "0"
+      # Load the dataset and run the default simulation on boot, so the first
+      # page view is not the one that pays for it.
+      RISK_ENGINE_WARM_START: "1"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"

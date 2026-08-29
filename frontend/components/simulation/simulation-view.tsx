@@ -56,8 +56,6 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
         seed,
         curve_points: 160,
         histogram_bins: 44,
-        include_sensitivity: true,
-        sensitivity_years: 5_000,
       })
       .then(setResult)
       .catch((cause: unknown) =>

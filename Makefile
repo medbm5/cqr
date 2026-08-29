@@ -55,7 +55,7 @@ archive: ## Zip the deliverable into dist-archive/ (tracked files only)
 	@$(PY) scripts/verify_archive.py $(ARCHIVE)
 
 docker-build: ## Build the api + web images
-	docker compose -f docker/docker-compose.yml build
+	docker compose build
 
 docker-up: ## Start the api (:8000) and web (:3000) containers
-	docker compose -f docker/docker-compose.yml up
+	docker compose up

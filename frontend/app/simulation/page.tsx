@@ -7,20 +7,13 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Simulation · Citalid Risk Engine" };
 
-/** Small enough to render the page quickly; the reader can run a longer one. */
-const INITIAL_YEARS = 5_000;
-
 export default async function SimulationPage() {
   let initial;
   try {
-    initial = await api.simulate({
-      n_years: INITIAL_YEARS,
-      seed: 42,
-      curve_points: 160,
-      histogram_bins: 44,
-      include_sensitivity: true,
-      sensitivity_years: 5_000,
-    });
+    // No n_years, seed or sensitivity_years: the defaults are what the server
+    // warms at boot, so the first render is served from cache. The reader picks
+    // a different size from the run panel, which then does compute.
+    initial = await api.simulate({ curve_points: 160, histogram_bins: 44 });
   } catch (error) {
     return (
       <>

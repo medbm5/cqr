@@ -131,7 +131,7 @@ def test_frequency_returns_rates_and_the_trace(client, dataset):
 
     assert response.status_code == 200
     body = response.json()
-    engine = pipeline.get_frequency()
+    engine = pipeline.get_frequency(pipeline.DEFAULT_THRESHOLD, pipeline.DEFAULT_WINDOW_HOURS)
 
     assert body["lambda_total"] == pytest.approx(engine.lambda_total)
     assert body["episodes"] == engine.episodes

@@ -15,7 +15,14 @@ from rest_framework import serializers
 from risk_engine.ingestion import SeverityClass
 from risk_engine.simulation import DEFAULT_SENSITIVITY_YEARS
 
-from .pipeline import DEFAULT_YEARS, MAX_YEARS, MIN_YEARS
+from .pipeline import (
+    DEFAULT_SEED,
+    DEFAULT_THRESHOLD,
+    DEFAULT_WINDOW_HOURS,
+    DEFAULT_YEARS,
+    MAX_YEARS,
+    MIN_YEARS,
+)
 
 #: Maximum points on an exceedance curve returned by the API.
 MAX_CURVE_POINTS = 500
@@ -280,17 +287,20 @@ class SimulationRequestSerializer(serializers.Serializer):
         ),
     )
     seed = serializers.IntegerField(
-        required=False, default=42, min_value=0, help_text="Seed; the run is reproducible from it."
+        required=False,
+        default=DEFAULT_SEED,
+        min_value=0,
+        help_text="Seed; the run is reproducible from it.",
     )
     severity_threshold = serializers.ChoiceField(
         required=False,
-        default=SeverityClass.HIGH.value,
+        default=DEFAULT_THRESHOLD.value,
         choices=[member.value for member in SeverityClass],
         help_text="Minimum severity for an event to count as an attack.",
     )
     session_window_hours = serializers.FloatField(
         required=False,
-        default=24.0,
+        default=DEFAULT_WINDOW_HOURS,
         min_value=0.25,
         max_value=720.0,
         help_text="Quiet period that ends an episode.",

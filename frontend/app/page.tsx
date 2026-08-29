@@ -15,21 +15,15 @@ import Link from "next/link";
  */
 export const dynamic = "force-dynamic";
 
-/** Years simulated for the landing figure: enough for a stable mean, fast enough to load. */
-const LANDING_YEARS = 10_000;
-
 async function loadHeadline(): Promise<Headline | { error: string }> {
   try {
     const [telemetry, frequency, simulation] = await Promise.all([
       api.telemetry(),
       api.frequency(),
-      // The tail is not on this page, so the curves are requested at their
-      // minimum and the sensitivity sweep is skipped.
-      api.simulate({
-        n_years: LANDING_YEARS,
-        curve_points: 2,
-        include_sensitivity: false,
-      }),
+      // Deliberately no n_years or seed: the API's own defaults are the set the
+      // server warms on boot, so asking for anything else here would compute a
+      // fresh simulation on the landing page's critical path.
+      api.simulate({ curve_points: 2 }),
     ]);
 
     const report = telemetry.normalization;

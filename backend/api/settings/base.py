@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # This project. Registered so its AppConfig can wire the cache warm-up.
+    "api.apps.ApiConfig",
     # Third party
     "rest_framework",
     "corsheaders",

@@ -11,6 +11,8 @@ testable without an HTTP server.
 
 from __future__ import annotations
 
+import logging
+import threading
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -44,6 +46,29 @@ from risk_engine.simulation import (
 MIN_YEARS = 100
 MAX_YEARS = 200_000
 DEFAULT_YEARS = 25_000
+
+#: The default request, in one place.
+#:
+#: These matter more than they look. `lru_cache` keys on the *call*, not on the
+#: resolved arguments, so `get_simulation(25_000, 42)` and
+#: `get_simulation(25_000, 42, SeverityClass.HIGH, 24.0)` are two different
+#: entries computing the same answer. Warming one and serving the other means
+#: warming a key nothing will ever hit - which is exactly what happened the first
+#: time this was measured in a container: 21s on the first request despite a
+#: "warm start complete" in the log.
+#:
+#: The cached functions below therefore take no defaults at all, so every caller
+#: is explicit and no two spellings of the same request can diverge.
+DEFAULT_SEED = 42
+DEFAULT_THRESHOLD = SeverityClass.HIGH
+DEFAULT_WINDOW_HOURS = 24.0
+
+logger = logging.getLogger(__name__)
+
+#: Serializes the warm-up against the first real request. Without it both would
+#: compute the same simulation at once - correct, because `lru_cache` would keep
+#: one, but twice the peak memory on an instance chosen for being small.
+_warm_lock = threading.Lock()
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,8 +118,8 @@ def get_dataset() -> Dataset:
 
 @lru_cache(maxsize=32)
 def get_frequency(
-    severity_threshold: SeverityClass = SeverityClass.HIGH,
-    session_window_hours: float = 24.0,
+    severity_threshold: SeverityClass,
+    session_window_hours: float,
 ) -> FrequencyEstimate:
     """Estimate frequency under one pair of conventions.
 
@@ -121,8 +146,8 @@ def get_frequency(
 def get_simulation(
     n_years: int,
     seed: int,
-    severity_threshold: SeverityClass = SeverityClass.HIGH,
-    session_window_hours: float = 24.0,
+    severity_threshold: SeverityClass,
+    session_window_hours: float,
 ) -> SimulationResult:
     """Run - or recall - one simulation.
 
@@ -144,7 +169,7 @@ def get_simulation(
 
 
 @lru_cache(maxsize=4)
-def get_sensitivity(seed: int, n_years: int = DEFAULT_SENSITIVITY_YEARS) -> SensitivityGrid:
+def get_sensitivity(seed: int, n_years: int) -> SensitivityGrid:
     """Run - or recall - the parameter sweep.
 
     Args:
@@ -164,6 +189,36 @@ def get_sensitivity(seed: int, n_years: int = DEFAULT_SENSITIVITY_YEARS) -> Sens
         seed=seed,
         baseline=FrequencyParams(),
     )
+
+
+def warm_start() -> None:
+    """Load the dataset and run the default simulation before any request.
+
+    Reading four CSVs, deduplicating 45,840 rows and fitting nine severity
+    distributions takes a few seconds; the default simulation takes a few more.
+    Doing it at boot means the first visitor reads a warm cache instead of
+    paying for the cold one.
+
+    Failures are logged and swallowed. A warm-up is an optimisation, and a
+    service that refuses to start because it could not pre-compute an
+    optimisation is worse than one that starts cold.
+    """
+    with _warm_lock:
+        try:
+            get_dataset()
+            # Exactly the call the view makes for a default request, argument for
+            # argument - including the sensitivity grid, which a default POST
+            # asks for and which costs nine more simulations.
+            get_simulation(DEFAULT_YEARS, DEFAULT_SEED, DEFAULT_THRESHOLD, DEFAULT_WINDOW_HOURS)
+            get_sensitivity(DEFAULT_SEED, DEFAULT_SENSITIVITY_YEARS)
+        except Exception:
+            logger.exception("warm start failed; the first request will pay for it")
+        else:
+            logger.info(
+                "warm start complete: dataset loaded, %s-year simulation and the "
+                "sensitivity grid cached",
+                f"{DEFAULT_YEARS:,}",
+            )
 
 
 def reset_caches() -> None:

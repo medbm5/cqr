@@ -51,7 +51,7 @@ def _frequency_from(request: Request) -> Any:
         ValueError: If either parameter is present but unusable, which the view
             turns into a 400.
     """
-    raw_threshold = request.query_params.get("severity_threshold", SeverityClass.HIGH.value)
+    raw_threshold = request.query_params.get("severity_threshold", pipeline.DEFAULT_THRESHOLD.value)
     try:
         threshold = SeverityClass(raw_threshold)
     except ValueError:
@@ -60,7 +60,9 @@ def _frequency_from(request: Request) -> Any:
             f"{[member.value for member in SeverityClass]}, got {raw_threshold!r}"
         ) from None
 
-    raw_window = request.query_params.get("session_window_hours", "24")
+    raw_window = request.query_params.get(
+        "session_window_hours", str(pipeline.DEFAULT_WINDOW_HOURS)
+    )
     try:
         window = float(raw_window)
     except (TypeError, ValueError):
