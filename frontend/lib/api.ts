@@ -75,6 +75,8 @@ export interface AssetRow {
   episodes: number;
   annual_rate: number;
   episodes_by_attack_type: Partial<Record<AttackType, number>>;
+  /** Episode counts keyed by the ISO date of the week's Monday; quiet weeks are absent. */
+  episodes_by_week: Record<string, number>;
 }
 
 export interface AssetInventoryResponse {

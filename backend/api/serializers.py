@@ -75,6 +75,7 @@ class AssetSerializer(serializers.Serializer):
     episodes = serializers.IntegerField()
     annual_rate = serializers.FloatField()
     episodes_by_attack_type = serializers.SerializerMethodField()
+    episodes_by_week = serializers.DictField(child=serializers.IntegerField())
 
     def get_episodes_by_attack_type(self, obj: Any) -> dict[str, int]:
         """Episode counts per attack type, non-zero only."""

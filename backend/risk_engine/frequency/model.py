@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from risk_engine.ingestion import Asset, NormalizationReport, SecurityEvent, TimeWindow
 
@@ -31,6 +32,10 @@ class AssetFrequency:
         episodes: Episodes observed on the asset over the window.
         annual_rate: Those episodes annualized.
         episodes_by_attack_type: Episode counts per attack type, non-zero only.
+        episodes_by_week: Episode counts keyed by the ISO date of the week's
+            Monday, ascending. Weeks with no episode are absent rather than
+            zero-filled: the caller knows the window and can tell a quiet week
+            from one outside it.
     """
 
     asset_id: str
@@ -40,6 +45,7 @@ class AssetFrequency:
     episodes: int
     annual_rate: float
     episodes_by_attack_type: Mapping[AttackType, int]
+    episodes_by_week: Mapping[str, int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -286,8 +292,12 @@ def _per_asset(
     """Build the per-asset breakdown, joined to the asset reference where possible."""
     reference = {asset.asset_id: asset for asset in assets}
     grouped: dict[str, Counter[AttackType]] = {}
+    weekly: dict[str, Counter[str]] = {}
     for episode in episodes:
         grouped.setdefault(episode.asset_id, Counter())[episode.attack_type] += 1
+        started = episode.started_at.date()
+        week = started - timedelta(days=started.weekday())
+        weekly.setdefault(episode.asset_id, Counter())[week.isoformat()] += 1
 
     breakdown = [
         AssetFrequency(
@@ -300,6 +310,7 @@ def _per_asset(
             episodes=sum(by_type.values()),
             annual_rate=sum(by_type.values()) * scale,
             episodes_by_attack_type=dict(by_type.most_common()),
+            episodes_by_week=dict(sorted(weekly[asset_id].items())),
         )
         for asset_id, by_type in grouped.items()
     ]

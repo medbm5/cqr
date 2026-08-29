@@ -57,7 +57,10 @@ def test_assets_lists_the_estate_with_its_attack_activity(client, dataset):
         "episodes",
         "annual_rate",
         "episodes_by_attack_type",
+        "episodes_by_week",
     }
+    # Weekly buckets exist for the heatmap and account for the asset's episodes.
+    assert sum(first["episodes_by_week"].values()) == first["episodes"]
     # Sorted by descending episode count, as the engine returns them.
     counts = [asset["episodes"] for asset in body["assets"]]
     assert counts == sorted(counts, reverse=True)
