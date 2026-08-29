@@ -3,7 +3,39 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    color-scheme: dark;
+  }
+
   body {
-    @apply bg-navy-950 text-slate-200 antialiased;
+    @apply bg-navy-950 text-ink antialiased;
+  }
+
+  /* One visible focus style everywhere, on the accent so it reads as "active". */
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-navy-950;
+  }
+
+  ::selection {
+    @apply bg-accent/25 text-ink;
+  }
+}
+
+@layer utilities {
+  /* Columns of numbers align; standalone display figures use proportional
+     digits, which read tighter at large sizes. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Respect a reduced-motion preference: transitions collapse rather than jump. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
