@@ -107,6 +107,38 @@ in my head.
 
 ---
 
+## 3b. Derive the loss cap from the company's own exposure
+
+**The problem it fixes.** Every drawn incident is currently clipped at the
+99.9th percentile of the cleaned peer losses (EUR 23,476,094). That bound is
+real evidence - it is the largest loss comparable organisations were actually
+observed to suffer - but it is a property of the *peer population*, not of this
+company. A 1,200-employee retailer and a 4,000-employee manufacturer sit under
+the same ceiling, which cannot be right: what an organisation can lose is a
+function of what it has.
+
+The cap is not a small correction. On the case data it removes **37.5% of the
+AAL** and **52% of TVaR 99**, so the assumption behind it carries about as much
+weight as the severity fit itself.
+
+**What it would look like.** A per-company exposure ceiling built from figures a
+risk quantification engagement would already have: annual revenue, balance-sheet
+assets, the record count behind a GDPR exposure, contractual liability caps. The
+cap becomes `min(business-interruption ceiling, data-liability ceiling, ...)`
+rather than a quantile, and the severity distribution is *truncated* at fitting
+time rather than the draws being clipped at simulation time - which is the
+statistically cleaner move, since clipping leaves a point mass at the ceiling
+that a truncated fit would not.
+
+**Why it wasn't done.** The case data carries no financial profile for the target
+company at all - no revenue, no assets, no customer count. Inventing one to
+justify a more sophisticated bound would have been a worse answer than reading
+the bound off the evidence that does exist and saying so. The point mass this
+leaves at the cap is visible in the loss histogram and labelled there rather than
+smoothed away.
+
+---
+
 ## 4. Dependence between attack types (copulas)
 
 **The problem it fixes.** The simulation draws each attack type's Poisson count

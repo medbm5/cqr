@@ -331,6 +331,18 @@ class SimulationRequestSerializer(serializers.Serializer):
         max_value=720.0,
         help_text="Quiet period that ends an episode.",
     )
+    loss_cap_eur = serializers.FloatField(
+        required=False,
+        default=None,
+        allow_null=True,
+        min_value=1.0,
+        help_text=(
+            "Per-incident plausibility ceiling in euros. Every drawn loss is clipped to it. "
+            "Omit to use the 99.9th percentile of the cleaned peer losses the severity model "
+            "was fitted on - the largest single loss comparable organisations were actually "
+            "observed to suffer."
+        ),
+    )
     curve_points = serializers.IntegerField(
         required=False,
         default=DEFAULT_CURVE_POINTS,
@@ -382,10 +394,31 @@ class ExceedanceCurveSerializer(serializers.Serializer):
 
 
 class LossHistogramSerializer(serializers.Serializer):
-    """The simulated annual-loss distribution, binned."""
+    """The simulated annual-loss distribution, binned.
+
+    `counts` covers loss-years only; `zero_years` is reported apart from them so
+    a chart can show the two on their own terms rather than letting the zero bar
+    flatten everything else.
+    """
 
     bin_edges_eur = serializers.ListField(child=serializers.FloatField())
     counts = serializers.ListField(child=serializers.IntegerField())
+    zero_years = serializers.IntegerField()
+    loss_years = serializers.IntegerField()
+    below_floor_years = serializers.IntegerField()
+    scale = serializers.CharField(help_text="'log' or 'linear' bin spacing.")
+
+
+class LossCapSerializer(serializers.Serializer):
+    """What the per-incident plausibility cap did to the run."""
+
+    cap_eur = serializers.FloatField()
+    quantile = serializers.FloatField(allow_null=True)
+    draws_capped = serializers.IntegerField()
+    draws_total = serializers.IntegerField()
+    share_capped = serializers.FloatField()
+    aal_uncapped = serializers.FloatField()
+    aal_reduction = serializers.FloatField()
 
 
 class SensitivityCellSerializer(serializers.Serializer):
@@ -424,6 +457,7 @@ class SimulationResponseSerializer(serializers.Serializer):
     aep_curve = ExceedanceCurveSerializer()
     oep_curve = ExceedanceCurveSerializer()
     histogram = LossHistogramSerializer()
+    loss_cap = LossCapSerializer()
     expected_loss_by_attack_type = serializers.DictField(child=serializers.FloatField())
     expected_incidents_by_attack_type = serializers.DictField(child=serializers.FloatField())
     n_years = serializers.IntegerField()

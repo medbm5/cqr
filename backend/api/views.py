@@ -182,6 +182,7 @@ def simulate(request: Request) -> Response:
         options["seed"],
         SeverityClass(options["severity_threshold"]),
         options["session_window_hours"],
+        options["loss_cap_eur"],
     )
     grid = (
         pipeline.get_sensitivity(options["seed"], options["sensitivity_years"])
@@ -202,6 +203,15 @@ def _payload(result: Any, grid: Any, options: dict[str, Any]) -> dict[str, Any]:
         "aep_curve": result.curve("aep", points=points),
         "oep_curve": result.curve("oep", points=points),
         "histogram": result.histogram(bins=options["histogram_bins"]),
+        "loss_cap": {
+            "cap_eur": result.cap.cap_eur,
+            "quantile": result.cap.quantile,
+            "draws_capped": result.cap.draws_capped,
+            "draws_total": result.cap.draws_total,
+            "share_capped": result.cap.share_capped,
+            "aal_uncapped": result.cap.aal_uncapped,
+            "aal_reduction": result.cap.aal_reduction(result.metrics.aal),
+        },
         "expected_loss_by_attack_type": {
             attack_type.value: value for attack_type, value in result.expected_loss_by_type.items()
         },

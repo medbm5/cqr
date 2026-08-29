@@ -251,10 +251,20 @@ def test_simulate_returns_metrics_curves_and_the_chain(client, dataset):
     assert body["aep_curve"]["kind"] == "aep"
     assert body["oep_curve"]["kind"] == "oep"
 
-    # The distribution behind the metrics, binned for a chart.
+    # The distribution behind the metrics, binned for a chart. Zero-loss years
+    # ride alongside the bins rather than inside them, so the two must account
+    # for the run between them.
     histogram = body["histogram"]
     assert len(histogram["bin_edges_eur"]) == len(histogram["counts"]) + 1
-    assert sum(histogram["counts"]) == body["n_years"]
+    assert sum(histogram["counts"]) == histogram["loss_years"]
+    assert histogram["loss_years"] + histogram["zero_years"] == body["n_years"]
+    assert histogram["scale"] == "log"
+
+    # The plausibility cap, and what it cost.
+    cap = body["loss_cap"]
+    assert cap["cap_eur"] > 0
+    assert cap["draws_capped"] <= cap["draws_total"]
+    assert cap["aal_uncapped"] >= body["metrics"]["aal"]
 
 
 def test_simulate_uses_documented_defaults(client, dataset):
@@ -265,6 +275,46 @@ def test_simulate_uses_documented_defaults(client, dataset):
     assert body["n_years"] == pipeline.DEFAULT_YEARS
     assert body["seed"] == 42
     assert body["params"] == {"severity_threshold": "high", "session_window_hours": 24.0}
+
+
+def test_simulate_accepts_an_explicit_loss_cap(client, dataset):
+    """The cap is a caller-visible modeling choice, not a hidden constant."""
+    payload = {"n_years": 2_000, "seed": 3, "include_sensitivity": False, "loss_cap_eur": 100_000.0}
+
+    body = client.post("/api/simulate/", payload, format="json").json()
+
+    assert body["loss_cap"]["cap_eur"] == 100_000.0
+    # Supplied rather than read off a quantile, and the response says which.
+    assert body["loss_cap"]["quantile"] is None
+    assert body["loss_cap"]["draws_capped"] > 0
+
+
+def test_the_default_loss_cap_is_read_off_the_peer_losses(client, dataset):
+    body = client.post(
+        "/api/simulate/", {"n_years": 1_000, "include_sensitivity": False}, format="json"
+    ).json()
+
+    assert body["loss_cap"]["quantile"] == pytest.approx(0.999)
+    assert body["loss_cap"]["cap_eur"] > 0
+
+
+def test_a_non_positive_loss_cap_is_rejected(client, dataset):
+    response = client.post(
+        "/api/simulate/", {"loss_cap_eur": 0.0, "include_sensitivity": False}, format="json"
+    )
+
+    assert response.status_code == 400
+    assert "loss_cap_eur" in response.json()
+
+
+def test_the_loss_cap_is_part_of_the_cache_key(client, dataset):
+    """Two caps are two answers; serving one from the other's cache would lie."""
+    base = {"n_years": 2_000, "seed": 3, "include_sensitivity": False}
+
+    tight = client.post("/api/simulate/", base | {"loss_cap_eur": 50_000.0}, format="json").json()
+    loose = client.post("/api/simulate/", base | {"loss_cap_eur": 5e9}, format="json").json()
+
+    assert tight["metrics"]["aal"] < loose["metrics"]["aal"]
 
 
 def test_simulate_is_reproducible_for_the_same_request(client, dataset):

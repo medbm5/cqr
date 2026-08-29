@@ -65,6 +65,11 @@ class SeverityModel:
         min_effective_n: The threshold that triggered any fallbacks.
         incidents_total: Incidents read.
         incidents_fitted: Incidents with a usable loss.
+        observed_losses_eur: Every cleaned loss the fits were made on, ascending.
+            Kept because the fitted lognormals are unbounded while the evidence
+            is not: the largest loss any comparable organisation actually
+            suffered is the only empirical statement available about how much
+            can be lost, and the simulation's plausibility cap is read off it.
     """
 
     fits: Mapping[AttackType, SeverityFit]
@@ -74,6 +79,34 @@ class SeverityModel:
     min_effective_n: float
     incidents_total: int
     incidents_fitted: int
+    observed_losses_eur: tuple[float, ...]
+
+    def loss_quantile(self, probability: float) -> float:
+        """A quantile of the cleaned losses the model was fitted on.
+
+        Empirical and *unweighted*, deliberately. Every other quantity in this
+        module is peer-weighted, because the question there is "what does an
+        incident cost an organisation like this one". The question here is
+        different: how large a single loss is physically possible at all. That
+        is a property of the observed population, not of which members of it
+        resemble the target, and weighting it would let a thin peer group shrink
+        the bound on the basis of similarity rather than evidence.
+
+        Args:
+            probability: Quantile to read, in [0, 1].
+
+        Returns:
+            The loss in euros at that quantile of the observed distribution.
+
+        Raises:
+            ValueError: If `probability` is outside [0, 1], or the model was
+                built with no observed losses.
+        """
+        if not 0.0 <= probability <= 1.0:
+            raise ValueError(f"probability must be in [0, 1], got {probability}")
+        if not self.observed_losses_eur:
+            raise ValueError("model carries no observed losses to read a quantile from")
+        return float(np.quantile(np.asarray(self.observed_losses_eur), probability))
 
     @property
     def params_by_type(self) -> Mapping[AttackType, LognormalParams]:
@@ -292,4 +325,5 @@ def fit_severity_model(
         min_effective_n=min_effective_n,
         incidents_total=len(incidents),
         incidents_fitted=len(usable),
+        observed_losses_eur=tuple(float(loss) for loss in np.sort(losses)),
     )

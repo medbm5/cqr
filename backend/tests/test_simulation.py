@@ -59,6 +59,10 @@ def constant_severity(loss_eur, *, attack_type=AttackType.RANSOMWARE):
         min_effective_n=30.0,
         incidents_total=1,
         incidents_fitted=1,
+        # Ten times the point mass, so the default plausibility cap sits well
+        # clear of every draw and the analytic checks below stay arithmetic.
+        # Tests that want the cap to bind pass `loss_cap_eur` explicitly.
+        observed_losses_eur=(loss_eur * 10.0,),
     )
 
 
@@ -428,14 +432,71 @@ def test_log_spaced_probabilities_reject_impossible_requests(points, finest, mat
         log_spaced_probabilities(points, finest=finest)
 
 
-def test_the_histogram_bins_every_simulated_year():
+def test_the_histogram_accounts_for_every_simulated_year():
+    """Bins cover loss-years; zero-years are held apart. Together they are the run."""
     result = simulate(frequency_of(3.0), constant_severity(1000.0), n_years=5_000, seed=12)
 
     histogram = result.histogram(bins=20)
 
     assert len(histogram.bin_edges_eur) == len(histogram.counts) + 1
-    assert sum(histogram.counts) == 5_000
+    assert sum(histogram.counts) == histogram.loss_years
+    assert histogram.loss_years + histogram.zero_years == 5_000
     assert list(histogram.bin_edges_eur) == sorted(histogram.bin_edges_eur)
+
+
+def test_the_histogram_separates_zero_years_from_the_bins():
+    """At lambda 0.3 most years cost nothing, and none of them enter a bin."""
+    result = simulate(frequency_of(0.3), constant_severity(1000.0), n_years=20_000, seed=21)
+
+    histogram = result.histogram(bins=30)
+
+    expected_zero = int(np.count_nonzero(result.annual_losses == 0.0))
+    assert histogram.zero_years == expected_zero
+    assert histogram.zero_years > 0.7 * 20_000
+    # The first bin holds loss-years, not the empty ones - that separation is
+    # the entire point, and mixing them buries the distribution in one bar.
+    assert histogram.counts[0] < histogram.zero_years
+
+
+def test_log_bins_are_log_spaced_and_linear_bins_are_not():
+    result = simulate(frequency_of(2.0), constant_severity(1000.0), n_years=5_000, seed=22)
+
+    log_edges = np.asarray(result.histogram(bins=20, scale="log").bin_edges_eur)
+    linear_edges = np.asarray(result.histogram(bins=20, scale="linear").bin_edges_eur)
+
+    ratios = log_edges[1:] / log_edges[:-1]
+    assert np.allclose(ratios, ratios[0])
+    differences = np.diff(linear_edges)
+    assert np.allclose(differences, differences[0])
+
+
+def test_loss_years_below_the_log_floor_are_folded_into_the_first_bin():
+    """A log axis starts at a floor; the years beneath it are counted, not dropped."""
+    result = simulate(frequency_of(1.0), constant_severity(1_000_000.0), n_years=2_000, seed=23)
+
+    histogram = result.histogram(bins=20, scale="log", floor_eur=2_000_000.0)
+
+    assert histogram.below_floor_years > 0
+    assert histogram.bin_edges_eur[0] == pytest.approx(2_000_000.0)
+    assert sum(histogram.counts) == histogram.loss_years
+
+
+def test_a_run_with_no_losses_yields_an_empty_histogram_not_invented_edges():
+    result = simulate(frequency_of(0.0), constant_severity(100.0), n_years=500, seed=24)
+
+    histogram = result.histogram(bins=20)
+
+    assert histogram.bin_edges_eur == ()
+    assert histogram.counts == ()
+    assert histogram.zero_years == 500
+    assert histogram.loss_years == 0
+
+
+def test_the_histogram_rejects_an_unknown_scale():
+    result = simulate(frequency_of(1.0), constant_severity(100.0), n_years=200, seed=0)
+
+    with pytest.raises(ValueError, match="scale must be"):
+        result.histogram(scale="logarithmic")
 
 
 def test_the_histogram_needs_at_least_one_bin():
@@ -443,3 +504,121 @@ def test_the_histogram_needs_at_least_one_bin():
 
     with pytest.raises(ValueError, match="bins must be at least 1"):
         result.histogram(bins=0)
+
+
+# ------------------------------------------------ the per-incident loss cap
+
+
+def wide_severity(mu, sigma, *, observed_max, attack_type=AttackType.RANSOMWARE):
+    """A genuinely heavy-tailed model, with an observed base to read a cap off."""
+    model = constant_severity(1.0, attack_type=attack_type)
+    params = LognormalParams(mu=mu, sigma=sigma)
+    fit = SeverityFit(
+        attack_type=attack_type,
+        params=params,
+        diagnostics=model.pooled.diagnostics,
+        own_observations=1,
+        own_effective_n=1.0,
+        used_pooled=False,
+    )
+    return SeverityModel(
+        fits=dict.fromkeys(AttackType, fit),
+        pooled=fit,
+        peer_params=PeerWeightParams(),
+        cleaning=cleaning_report(),
+        min_effective_n=30.0,
+        incidents_total=1,
+        incidents_fitted=1,
+        observed_losses_eur=(observed_max,),
+    )
+
+
+def test_no_single_incident_exceeds_the_cap():
+    """The invariant the cap exists to enforce.
+
+    Read off the annual *maxima*: the largest single loss in any simulated year
+    is by definition the largest single draw the run produced, so if the cap
+    held for it, it held for every draw. A year's total may exceed the cap - three
+    capped incidents cost three caps - and that is correct, since only one
+    implausible loss is disallowed, not the accumulation of plausible ones.
+    """
+    cap = 5_000_000.0
+    severity = wide_severity(mu=math.log(200_000.0), sigma=2.6, observed_max=1e12)
+
+    result = simulate(frequency_of(3.0), severity, n_years=50_000, seed=31, loss_cap_eur=cap)
+
+    assert result.annual_maxima.max() <= cap
+    assert result.cap.cap_eur == cap
+    # A sigma of 2.6 over 150,000 draws certainly produces losses above 5M, so a
+    # zero here would mean the cap was silently not applied rather than not needed.
+    assert result.cap.draws_capped > 0
+
+
+def test_the_cap_defaults_to_the_observed_loss_quantile():
+    severity = wide_severity(mu=math.log(100_000.0), sigma=2.0, observed_max=9_000_000.0)
+
+    result = simulate(frequency_of(1.0), severity, n_years=5_000, seed=32)
+
+    assert result.cap.cap_eur == pytest.approx(9_000_000.0)
+    assert result.cap.quantile == pytest.approx(0.999)
+    assert result.params.loss_cap_eur == pytest.approx(9_000_000.0)
+
+
+def test_a_caller_supplied_cap_records_no_quantile():
+    severity = wide_severity(mu=math.log(100_000.0), sigma=2.0, observed_max=9_000_000.0)
+
+    result = simulate(frequency_of(1.0), severity, n_years=2_000, seed=33, loss_cap_eur=1_000.0)
+
+    assert result.cap.quantile is None
+    assert result.cap.cap_eur == 1_000.0
+
+
+def test_the_cap_lowers_the_aal_and_the_reduction_is_reported():
+    severity = wide_severity(mu=math.log(200_000.0), sigma=2.6, observed_max=1e12)
+    capped = simulate(frequency_of(2.0), severity, n_years=50_000, seed=34, loss_cap_eur=5e6)
+
+    assert capped.metrics.aal < capped.cap.aal_uncapped
+    assert 0.0 < capped.cap.aal_reduction(capped.metrics.aal) < 1.0
+    assert 0.0 < capped.cap.share_capped < 1.0
+    assert capped.cap.draws_total > capped.cap.draws_capped
+
+
+def test_an_infinite_cap_leaves_the_draws_untouched():
+    """The escape hatch: `math.inf` runs genuinely uncapped."""
+    severity = wide_severity(mu=math.log(200_000.0), sigma=2.6, observed_max=1e12)
+
+    result = simulate(frequency_of(2.0), severity, n_years=20_000, seed=35, loss_cap_eur=math.inf)
+
+    assert result.cap.draws_capped == 0
+    assert result.metrics.aal == pytest.approx(result.cap.aal_uncapped)
+
+
+def test_a_cap_that_binds_on_nothing_changes_nothing():
+    """A cap far above every draw must leave the answer bit-identical."""
+    severity = wide_severity(mu=math.log(1_000.0), sigma=0.5, observed_max=1e15)
+
+    generous = simulate(frequency_of(2.0), severity, n_years=10_000, seed=36, loss_cap_eur=1e12)
+    unlimited = simulate(
+        frequency_of(2.0), severity, n_years=10_000, seed=36, loss_cap_eur=math.inf
+    )
+
+    assert generous.metrics.aal == pytest.approx(unlimited.metrics.aal)
+    assert generous.cap.draws_capped == 0
+
+
+def test_the_cap_reaches_the_explanation():
+    severity = wide_severity(mu=math.log(200_000.0), sigma=2.6, observed_max=1e12)
+
+    result = simulate(frequency_of(2.0), severity, n_years=10_000, seed=37, loss_cap_eur=5e6)
+    trace = "\n".join(result.to_explanation())
+
+    assert "Capped every single incident loss at EUR 5,000,000" in trace
+    assert "AAL uncapped EUR" in trace
+    assert "hit the ceiling" in trace
+
+
+def test_a_non_positive_cap_is_refused():
+    severity = wide_severity(mu=0.0, sigma=1.0, observed_max=10.0)
+
+    with pytest.raises(ValueError, match="loss_cap_eur must be positive"):
+        simulate(frequency_of(1.0), severity, n_years=100, seed=0, loss_cap_eur=0.0)

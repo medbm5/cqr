@@ -224,6 +224,8 @@ export interface SimulationRequest {
   session_window_hours?: number;
   curve_points?: number;
   histogram_bins?: number;
+  /** Per-incident plausibility ceiling. Omit for the engine's 99.9th-percentile default. */
+  loss_cap_eur?: number;
   include_sensitivity?: boolean;
   sensitivity_years?: number;
 }
@@ -241,7 +243,25 @@ export interface SimulationResponse {
   };
   aep_curve: ExceedanceCurve;
   oep_curve: ExceedanceCurve;
-  histogram: { bin_edges_eur: number[]; counts: number[] };
+  histogram: {
+    bin_edges_eur: number[];
+    /** Loss-years per bin. Zero-loss years are NOT in here - see `zero_years`. */
+    counts: number[];
+    zero_years: number;
+    loss_years: number;
+    below_floor_years: number;
+    scale: "log" | "linear";
+  };
+  loss_cap: {
+    cap_eur: number;
+    /** Null when the caller supplied the ceiling instead of reading a quantile. */
+    quantile: number | null;
+    draws_capped: number;
+    draws_total: number;
+    share_capped: number;
+    aal_uncapped: number;
+    aal_reduction: number;
+  };
   expected_loss_by_attack_type: Partial<Record<AttackType, number>>;
   expected_incidents_by_attack_type: Partial<Record<AttackType, number>>;
   n_years: number;

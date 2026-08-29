@@ -23,8 +23,10 @@ with the span of answers the defensible choices produce.
 """
 
 from .engine import (
+    DEFAULT_LOSS_CAP_QUANTILE,
     DEFAULT_N_YEARS,
     DRAWS_PER_BLOCK,
+    HISTOGRAM_FLOOR_EUR,
     SimulationParams,
     SimulationResult,
     simulate,
@@ -32,6 +34,7 @@ from .engine import (
 from .metrics import (
     DEFAULT_EXCEEDANCE_PROBABILITIES,
     ExceedanceCurve,
+    LossCap,
     LossHistogram,
     LossMetrics,
     exceedance_curve,
@@ -49,12 +52,15 @@ from .sensitivity import (
 
 __all__ = [
     "DEFAULT_EXCEEDANCE_PROBABILITIES",
+    "DEFAULT_LOSS_CAP_QUANTILE",
     "DEFAULT_N_YEARS",
     "DEFAULT_SENSITIVITY_YEARS",
     "DEFAULT_SESSION_WINDOWS",
     "DEFAULT_THRESHOLDS",
     "DRAWS_PER_BLOCK",
+    "HISTOGRAM_FLOOR_EUR",
     "ExceedanceCurve",
+    "LossCap",
     "LossHistogram",
     "LossMetrics",
     "SensitivityCell",

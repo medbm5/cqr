@@ -185,6 +185,7 @@ def get_simulation(
     seed: int,
     severity_threshold: SeverityClass,
     session_window_hours: float,
+    loss_cap_eur: float | None,
 ) -> SimulationResult:
     """Run - or recall - one simulation.
 
@@ -193,6 +194,9 @@ def get_simulation(
         seed: Seed for every draw.
         severity_threshold: Frequency convention.
         session_window_hours: Frequency convention.
+        loss_cap_eur: Per-incident ceiling, or None for the engine's default.
+            Part of the cache key: two runs differing only in the cap are two
+            different answers.
 
     Returns:
         The cached result for those arguments.
@@ -202,6 +206,7 @@ def get_simulation(
         get_dataset().severity,
         n_years=n_years,
         seed=seed,
+        loss_cap_eur=loss_cap_eur,
     )
 
 
@@ -247,7 +252,9 @@ def warm_start() -> None:
             # Exactly the call the view makes for a default request, argument for
             # argument - including the sensitivity grid, which a default POST
             # asks for and which costs nine more simulations.
-            get_simulation(DEFAULT_YEARS, DEFAULT_SEED, DEFAULT_THRESHOLD, DEFAULT_WINDOW_HOURS)
+            get_simulation(
+                DEFAULT_YEARS, DEFAULT_SEED, DEFAULT_THRESHOLD, DEFAULT_WINDOW_HOURS, None
+            )
             get_sensitivity(DEFAULT_SEED, DEFAULT_GRID_YEARS)
         except Exception:
             logger.exception("warm start failed; the first request will pay for it")

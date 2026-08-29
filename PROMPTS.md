@@ -43,8 +43,9 @@ key** for sessionization. Both are recorded in `prompts/03_frequency.md`.
 | 10 | [10 — Deployment](prompts/10_deploy.md) | `feat(deploy)` | 8 |
 | 11 | [11 — Frequency calibration](prompts/11_calibration.md) | `fix(frequency)` | 5 |
 | 12 | [12 — Plain-language hint tooltips](prompts/12_hint_tooltips.md) | `feat(web)` | 5 |
+| 13 | [13 — Loss plausibility cap and a readable loss histogram](prompts/13_loss_cap_histogram.md) | `feat(simulation)` | 0 |
 
-13 annexes, 10,492 words, covering 171 lines of verbatim prompt.
+14 annexes, 11,640 words, covering 190 lines of verbatim prompt.
 
 ## Findings the model surfaced and a human judged
 

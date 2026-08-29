@@ -26,6 +26,7 @@ from risk_engine.severity import LognormalParams, SeverityModel
 
 from .metrics import (
     ExceedanceCurve,
+    LossCap,
     LossHistogram,
     LossMetrics,
     exceedance_curve,
@@ -61,6 +62,30 @@ DEFAULT_N_YEARS = 100_000
 #: block sizes agree statistically rather than exactly.
 DRAWS_PER_BLOCK = 2_000_000
 
+#: Quantile of observed peer losses used as the default per-incident ceiling.
+#:
+#: The severity model fits a lognormal, which has no upper bound: at the sigmas
+#: this data produces - 1.99 pooled, 2.41 on data breach, 2.58 on supply chain -
+#: it will eventually draw a single incident costing more than the company is
+#: worth, and a 100,000-year run is enough draws. On the case data the uncapped
+#: worst simulated year reached EUR 3.8 billion for a company of 1,200 people.
+#: The distribution says such a loss is possible; physical reality says it is
+#: not, because a 1,200-employee ETI cannot lose more than it has. The tail
+#: beyond the observed maximum is an artefact of the functional form, not
+#: evidence.
+#:
+#: 0.999 of the cleaned incident base rather than its maximum: the maximum is a
+#: single observation and moves with the next row added, while the 99.9th
+#: percentile is a statement about the population that one outlier cannot swing.
+DEFAULT_LOSS_CAP_QUANTILE = 0.999
+
+#: Lowest bin edge for a log-scaled histogram, in euros.
+#:
+#: A log axis cannot start at zero and a year costing eleven euros is not a
+#: distinct fact from one costing nine. Everything below folds into the first
+#: bin, which is counted separately so the bar can say so.
+HISTOGRAM_FLOOR_EUR = 1_000.0
+
 
 @dataclass(frozen=True, slots=True)
 class SimulationParams:
@@ -69,6 +94,7 @@ class SimulationParams:
     Attributes:
         n_years: Simulated years.
         seed: Seed for every draw. The whole run is reproducible from it.
+        loss_cap_eur: Per-incident ceiling every drawn loss was clipped to.
         draws_per_block: Memory budget, in individual loss draws. A block holds
             two arrays of this length, so peak memory is about 16 bytes times
             this number. Reproducibility is exact for a *fixed* value - the same
@@ -79,6 +105,7 @@ class SimulationParams:
 
     n_years: int
     seed: int
+    loss_cap_eur: float
     draws_per_block: int = DRAWS_PER_BLOCK
 
 
@@ -100,7 +127,8 @@ class SimulationResult:
         expected_loss_by_type: Mean annual loss attributable to each attack type.
             These sum to the AAL and are what an "where does the risk come from"
             chart is made of.
-        params: Seed, year count and memory budget.
+        cap: What the per-incident plausibility cap did to the run.
+        params: Seed, year count, cap and memory budget.
         frequency: The frequency estimate the counts came from.
         severity: The severity model the losses came from.
     """
@@ -112,6 +140,7 @@ class SimulationResult:
     annual_maxima: Floats
     expected_incidents_by_type: Mapping[AttackType, float]
     expected_loss_by_type: Mapping[AttackType, float]
+    cap: LossCap
     params: SimulationParams
     frequency: FrequencyEstimate
     severity: SeverityModel
@@ -143,28 +172,93 @@ class SimulationResult:
             probabilities=log_spaced_probabilities(points, finest=1.0 / series.size),
         )
 
-    def histogram(self, *, bins: int = 40) -> LossHistogram:
+    def histogram(
+        self,
+        *,
+        bins: int = 40,
+        scale: str = "log",
+        floor_eur: float = HISTOGRAM_FLOOR_EUR,
+    ) -> LossHistogram:
         """Bin the simulated years for a distribution chart.
 
         Derived from the stored per-year series rather than returned by default,
         because the bin count is a presentation choice and the series is already
         here.
 
+        Two presentation decisions are made here rather than in the client,
+        because both are needed to make the chart readable at all and a client
+        that got them wrong would misrepresent the model:
+
+        **Zero-loss years are separated.** Roughly three years in four cost
+        nothing, so binning them with the rest gives one bar holding 73% of the
+        mass and thirty-nine bars indistinguishable from the axis.
+
+        **Bins are log-spaced by default.** Annual losses span from a few
+        hundred euros to tens of millions. Linear bins of that range put every
+        loss-year in the first two, which is the same failure again.
+
         Args:
-            bins: Number of bins across the observed range.
+            bins: Number of bins across the loss-years' range.
+            scale: `"log"` for log-spaced edges, `"linear"` for equal ones.
+            floor_eur: Lowest bin edge on a log scale. Loss-years below it are
+                folded into the first bin and counted in `below_floor_years`.
 
         Returns:
-            Bin edges in euros and the count of years in each.
+            The bins, the zero-year count, and how many loss-years fell below
+            the floor.
 
         Raises:
-            ValueError: If `bins` is below 1.
+            ValueError: If `bins` is below 1, `scale` is not log or linear, or
+                `floor_eur` is not positive.
         """
         if bins < 1:
             raise ValueError(f"bins must be at least 1, got {bins}")
-        counts, edges = np.histogram(self.annual_losses, bins=bins)
+        if scale not in {"log", "linear"}:
+            raise ValueError(f"scale must be 'log' or 'linear', got {scale!r}")
+        if floor_eur <= 0.0:
+            raise ValueError(f"floor_eur must be positive, got {floor_eur}")
+
+        losses = self.annual_losses
+        positive = losses[losses > 0.0]
+        zero_years = int(losses.size - positive.size)
+
+        if positive.size == 0:
+            # Every year cost nothing. There is no distribution to bin, and
+            # inventing edges over an empty range would only produce a chart of
+            # noise - the zero-year count carries the whole finding.
+            return LossHistogram(
+                bin_edges_eur=(),
+                counts=(),
+                zero_years=zero_years,
+                loss_years=0,
+                below_floor_years=0,
+                scale=scale,
+            )
+
+        top = float(positive.max())
+        if scale == "linear":
+            edges = np.linspace(float(positive.min()), top, bins + 1)
+            below_floor = 0
+        else:
+            # Honour the requested floor unless it would invert the range - a
+            # run whose worst year costs less than the floor has no bins to
+            # draw. Clamping it whenever it merely sits high would silently
+            # ignore a caller who asked for a floor on purpose.
+            low = floor_eur if floor_eur < top else top / 10.0
+            edges = np.logspace(np.log10(low), np.log10(top), bins + 1)
+            below_floor = int(np.count_nonzero(positive < low))
+
+        # Clip rather than drop: a year below the floor is still a loss-year,
+        # and letting np.histogram discard it would leave the bars summing to
+        # less than the loss-year count with nothing on screen saying so.
+        counts, _ = np.histogram(np.clip(positive, edges[0], edges[-1]), bins=edges)
         return LossHistogram(
-            bin_edges_eur=tuple(edges.tolist()),
+            bin_edges_eur=tuple(float(edge) for edge in edges),
             counts=tuple(int(count) for count in counts),
+            zero_years=zero_years,
+            loss_years=int(positive.size),
+            below_floor_years=below_floor,
+            scale=scale,
         )
 
     def to_explanation(self) -> list[str]:
@@ -192,6 +286,34 @@ class SimulationResult:
                 f"simulation draws from this, not from the detection rate."
             )
         lines.append("Severity: a lognormal per attack type, fitted on peer-weighted incidents.")
+
+        cap = self.cap
+        source = (
+            f"the {cap.quantile * 100:.1f}th percentile of the "
+            f"{self.severity.incidents_fitted:,} cleaned peer loss(es)"
+            if cap.quantile is not None
+            else "a caller-supplied ceiling"
+        )
+        widest = max(
+            (
+                self.severity.fits[attack_type].params.sigma
+                for attack_type in self.expected_loss_by_type
+            ),
+            default=self.severity.pooled.params.sigma,
+        )
+        lines.append(
+            f"Capped every single incident loss at EUR {cap.cap_eur:,.0f} - {source}. An "
+            f"unbounded lognormal at sigma {widest:.2f} will eventually draw one incident "
+            f"costing more than the company is worth; that draw is the functional form "
+            f"extrapolating past every observation it was fitted on, not evidence."
+        )
+        lines.append(
+            f"  {cap.draws_capped:,} of {cap.draws_total:,} drawn incident(s) hit the "
+            f"ceiling ({cap.share_capped:.3%}). AAL uncapped EUR {cap.aal_uncapped:,.0f} "
+            f"-> capped EUR {metrics.aal:,.0f}, a reduction of "
+            f"{cap.aal_reduction(metrics.aal):.1%}."
+        )
+
         lines.append("Per attack type, the inputs and what they contributed:")
         # Sorting the mapping's items rather than the enum itself: iterating a
         # StrEnum through sorted() widens the member type back to str.
@@ -260,13 +382,32 @@ def simulate(
     *,
     n_years: int = DEFAULT_N_YEARS,
     seed: int = 42,
+    loss_cap_eur: float | None = None,
     draws_per_block: int = DRAWS_PER_BLOCK,
 ) -> SimulationResult:
     """Compound frequency and severity into a distribution of annual loss.
 
     For each attack type, each simulated year draws `Poisson(lambda_type)`
-    incidents and one loss per incident from that type's fitted lognormal. The
-    year's loss is the sum across every incident of every type.
+    incidents and one loss per incident from that type's fitted lognormal, capped
+    at `loss_cap_eur`. The year's loss is the sum across every incident of every
+    type.
+
+    **Why the cap.** A lognormal has no upper bound. Fitted on this data it
+    carries sigmas from 1.37 to 2.58, and a distribution that wide will, given
+    enough draws, price a single incident above ten times the target company's
+    plausible revenue - a 100,000-year run is enough draws, and on the case data
+    the uncapped worst year reached EUR 3.8 billion. Those draws are not a
+    forecast of a catastrophic breach; they are the functional form extrapolating
+    past every observation it was fitted on. Real losses are bounded by what the
+    organisation can actually lose: its cash, its receivables, its customers, its
+    market value. Clipping each incident to the 99.9th percentile of what
+    comparable organisations were actually observed to lose keeps the tail heavy
+    - it remains two orders of magnitude above the median incident - while
+    refusing to let an unbounded functional form invent the top of it.
+
+    The cap binds per *incident*, not per year: a year with three capped
+    incidents costs three times the cap, which is correct. Only the single
+    implausible loss is disallowed, not the accumulation of plausible ones.
 
     The work is vectorized: one Poisson draw for a whole block of years, one
     lognormal draw for every incident in that block, and one `bincount` to fold
@@ -278,20 +419,35 @@ def simulate(
         severity: Fitted loss distributions per attack type.
         n_years: Years to simulate. More years resolve a finer tail.
         seed: Seed for every draw in the run.
+        loss_cap_eur: Per-incident ceiling in euros. Defaults to the
+            `DEFAULT_LOSS_CAP_QUANTILE` quantile of the cleaned peer losses the
+            severity model was fitted on - roughly EUR 23M on the case data.
+            Pass `math.inf` to run genuinely uncapped.
         draws_per_block: Approximate number of loss draws to hold at once.
 
     Returns:
-        The simulated distribution, its metrics and both exceedance curves.
+        The simulated distribution, its metrics, both exceedance curves, and a
+        `cap` record giving how many draws were clipped and what the average
+        annual loss would have been without the cap.
 
     Raises:
         ValueError: If `n_years` is not positive, if `draws_per_block` is not
-            positive, or if the frequency estimate has not been calibrated into
-            incident rates.
+            positive, if `loss_cap_eur` is not positive, or if the frequency
+            estimate has not been calibrated into incident rates.
     """
     if n_years <= 0:
         raise ValueError(f"n_years must be positive, got {n_years}")
     if draws_per_block <= 0:
         raise ValueError(f"draws_per_block must be positive, got {draws_per_block}")
+    if loss_cap_eur is not None and loss_cap_eur <= 0.0:
+        raise ValueError(f"loss_cap_eur must be positive, got {loss_cap_eur}")
+
+    cap_quantile = None if loss_cap_eur is not None else DEFAULT_LOSS_CAP_QUANTILE
+    cap = (
+        loss_cap_eur
+        if loss_cap_eur is not None
+        else severity.loss_quantile(DEFAULT_LOSS_CAP_QUANTILE)
+    )
 
     # The *incident* rate, never the detection rate. The severity model prices
     # incidents that produced a loss, so drawing Poisson counts from detected
@@ -318,6 +474,9 @@ def simulate(
     annual_maxima = np.zeros(n_years, dtype=np.float64)
     loss_by_type: dict[AttackType, float] = dict.fromkeys(rates, 0.0)
     incidents_by_type: dict[AttackType, float] = dict.fromkeys(rates, 0.0)
+    draws_capped = 0
+    draws_total = 0
+    uncapped_sum = 0.0
 
     rng = np.random.default_rng(seed)
     for start, stop in _blocks(n_years, sum(rates.values()), draws_per_block):
@@ -331,6 +490,15 @@ def simulate(
 
             distribution = params_by_type[attack_type]
             losses = rng.lognormal(mean=distribution.mu, sigma=distribution.sigma, size=total)
+
+            # The uncapped total is accumulated as a scalar rather than a second
+            # per-year array: the comparison the reader needs is of averages, and
+            # a running sum costs nothing where another n_years array costs
+            # memory the block budget exists to protect.
+            draws_total += total
+            uncapped_sum += float(losses.sum())
+            draws_capped += int(np.count_nonzero(losses > cap))
+            losses = np.minimum(losses, cap)
 
             years = np.repeat(np.arange(block), counts)
             totals = np.bincount(years, weights=losses, minlength=block)
@@ -353,7 +521,19 @@ def simulate(
         expected_loss_by_type={
             attack_type: total / n_years for attack_type, total in loss_by_type.items()
         },
-        params=SimulationParams(n_years=n_years, seed=seed, draws_per_block=draws_per_block),
+        cap=LossCap(
+            cap_eur=cap,
+            quantile=cap_quantile,
+            draws_capped=draws_capped,
+            draws_total=draws_total,
+            aal_uncapped=uncapped_sum / n_years,
+        ),
+        params=SimulationParams(
+            n_years=n_years,
+            seed=seed,
+            loss_cap_eur=cap,
+            draws_per_block=draws_per_block,
+        ),
         frequency=frequency,
         severity=severity,
     )

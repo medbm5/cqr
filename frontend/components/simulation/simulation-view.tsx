@@ -10,7 +10,7 @@ import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { Card } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { api, type SimulationResponse } from "@/lib/api";
-import { compactEur, fullEur, fullNumber } from "@/lib/format";
+import { compactEur, fullEur, fullNumber, percent } from "@/lib/format";
 
 import { ExceedanceCurves } from "./exceedance-curves";
 import { LossHistogram } from "./loss-histogram";
@@ -183,6 +183,7 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
                   ? `, so the mean sits ${(metrics.aal / metrics.median).toFixed(1)}× above the typical one.`
                   : "."}
               </p>
+              <CapNote cap={result.loss_cap} aal={metrics.aal} />
             </Card>
           </motion.div>
 
@@ -228,8 +229,8 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
           <motion.div {...reveal(2)}>
             <LossHistogram
               histogram={result.histogram}
-              aal={metrics.aal}
-              median={metrics.median}
+              metrics={metrics}
+              cap={result.loss_cap}
               years={result.n_years}
             />
           </motion.div>
@@ -250,6 +251,48 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
         </motion.div>
       </AnimatePresence>
     </>
+  );
+}
+
+/**
+ * What the plausibility cap cost, stated beside the figure it changed.
+ *
+ * A cap that removes a third of the AAL is not an implementation detail. It is
+ * reported next to the headline rather than buried in the trace, because a
+ * reader comparing this number against an uncapped one elsewhere needs to know
+ * which they are looking at without opening anything.
+ */
+function CapNote({
+  cap,
+  aal,
+}: {
+  cap: SimulationResponse["loss_cap"];
+  aal: number;
+}) {
+  if (cap.draws_capped === 0) {
+    return (
+      <p className="mt-4 text-xs leading-relaxed text-ink-muted">
+        No single incident reached the {compactEur(cap.cap_eur)} plausibility ceiling, so the cap
+        changed nothing in this run.
+      </p>
+    );
+  }
+
+  // One string rather than interleaved JSX: six interpolations in two
+  // sentences, most of them butted against punctuation, read as a sentence here
+  // and as a jigsaw in JSX.
+  const source =
+    cap.quantile === null
+      ? "set for this run"
+      : `the ${(cap.quantile * 100).toFixed(1)}th percentile of what comparable organisations were actually observed to lose`;
+
+  return (
+    <p className="mt-4 max-w-2xl text-xs leading-relaxed text-ink-muted">
+      {`Each incident is capped at ${compactEur(cap.cap_eur)} — ${source}. ` +
+        `${fullNumber(cap.draws_capped)} of ${fullNumber(cap.draws_total)} drawn incidents ` +
+        `(${percent(cap.share_capped, 2)}) hit it, removing ${percent(cap.aal_reduction)} of the ` +
+        `uncapped average: ${fullEur(cap.aal_uncapped)} against ${fullEur(aal)}.`}
+    </p>
   );
 }
 

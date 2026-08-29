@@ -96,16 +96,77 @@ class ExceedanceCurve:
 
 
 @dataclass(frozen=True, slots=True)
+class LossCap:
+    """What the plausibility cap on a single incident loss did to the run.
+
+    Reported rather than applied silently. A cap is a modeling assumption with
+    teeth - it removes exactly the draws that dominate a heavy tail - so the
+    reader is owed the size of the effect and the count of draws it touched,
+    not just the capped answer.
+
+    Attributes:
+        cap_eur: The per-incident ceiling every draw was clipped to.
+        quantile: The quantile of observed peer losses the cap was read off,
+            or `None` when the caller supplied the figure directly.
+        draws_capped: Individual incident losses that hit the ceiling.
+        draws_total: Individual incident losses drawn in the whole run.
+        aal_uncapped: What the average annual loss would have been with no cap.
+    """
+
+    cap_eur: float
+    quantile: float | None
+    draws_capped: int
+    draws_total: int
+    aal_uncapped: float
+
+    @property
+    def share_capped(self) -> float:
+        """Fraction of drawn incidents that hit the ceiling. Zero when none did."""
+        return self.draws_capped / self.draws_total if self.draws_total else 0.0
+
+    def aal_reduction(self, aal: float) -> float:
+        """How much of the uncapped AAL the cap removed, as a fraction.
+
+        Args:
+            aal: The capped average annual loss from the same run.
+
+        Returns:
+            The share removed, or 0.0 when there was nothing to remove.
+        """
+        if self.aal_uncapped <= 0.0:
+            return 0.0
+        return (self.aal_uncapped - aal) / self.aal_uncapped
+
+
+@dataclass(frozen=True, slots=True)
 class LossHistogram:
     """The simulated annual-loss distribution, binned for a chart.
 
+    Zero-loss years are held apart from the bins rather than placed in the first
+    one. Most years cost nothing at all, so a bin containing them is three orders
+    of magnitude taller than every other bin and flattens the entire loss
+    distribution into the axis - the chart then shows one fact, which the reader
+    already knew, and hides the shape it was drawn for.
+
     Attributes:
-        bin_edges_eur: `bins + 1` edges in euros, ascending.
-        counts: Simulated years falling in each bin.
+        bin_edges_eur: `bins + 1` edges in euros, ascending. Log-spaced when
+            `scale` is `"log"`.
+        counts: Loss-years falling in each bin. Sums to `loss_years`.
+        zero_years: Simulated years with no loss at all.
+        loss_years: Simulated years with a loss, the population the bins cover.
+        below_floor_years: Loss-years costing less than the first edge, folded
+            into the first bin. A log axis cannot start at zero, so it starts at
+            a floor; these are counted so the first bar can be labelled honestly
+            rather than silently understating itself.
+        scale: `"log"` or `"linear"`, the spacing of the edges.
     """
 
     bin_edges_eur: tuple[float, ...]
     counts: tuple[int, ...]
+    zero_years: int
+    loss_years: int
+    below_floor_years: int
+    scale: str
 
 
 def log_spaced_probabilities(points: int, *, finest: float) -> tuple[float, ...]:

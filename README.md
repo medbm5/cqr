@@ -12,16 +12,30 @@ what the CLI prints, what the API serves, and what the web UI displays.
 ## The headline
 
 ```
-AAL          EUR   438,038        VaR 95   EUR     816,323
+AAL          EUR   273,704        VaR 95   EUR     816,323
 median year  EUR         0        VaR 99   EUR   6,665,810
-P(no loss)        73.7%           TVaR 99  EUR  31,567,672
+P(no loss)        73.7%           TVaR 99  EUR  15,134,257
                                  100,000 simulated years, seed 42
 ```
 
-Three years in four cost nothing; the average year costs €438k because roughly
+Three years in four cost nothing; the average year costs €274k because roughly
 one year in twenty is expensive and one in a hundred is severe. That shape —
 mostly quiet, occasionally ruinous — is what a cyber loss distribution looks
 like, and reproducing it is the point.
+
+**Each incident is capped at €23,476,094** — the 99.9th percentile of the 1,598
+cleaned peer losses. A lognormal has no upper bound, and at the sigmas this data
+produces (up to 2.58) a 100,000-year run eventually draws a single incident
+costing more than the company is worth: uncapped, the worst simulated year here
+reached **€3.8 billion** for a company of 1,200 people. That is the functional
+form extrapolating past every observation it was fitted on, not evidence.
+
+The cap is not cosmetic, and the effect is reported rather than absorbed:
+0.9% of drawn incidents hit the ceiling, and they carried **37.5% of the
+uncapped AAL** (€438,038 → €273,704). VaR 95 and VaR 99 do not move at all — the
+cap binds only beyond the 99th percentile of *annual* loss — while TVaR 99 falls
+52%. Pass `loss_cap_eur` to `POST /api/simulate/` to change it, or `math.inf` to
+run genuinely uncapped.
 
 **The number rests on one conversion that is worth understanding before trusting
 it.** The telemetry counts *detected attacks*: 911 episodes over 212 days, or
@@ -48,7 +62,7 @@ evidence back some weight.
 
 Two other things a reader should know:
 
-- **`data_breach` drives 61% of the AAL** on 19% of the episodes, because its
+- **`data_breach` drives 46% of the AAL** on 19% of the episodes, because its
   fitted mean loss is €4.8M against a €571k pooled mean. The answer is sensitive
   to the technique-to-attack-type mapping in a way the headline does not show.
 - **The Pareto diagnostic says five of eight tails are understated**, so VaR 99
@@ -100,7 +114,7 @@ Requires Python 3.11+ and Node 20+.
 ```bash
 make install     # editable backend install, pre-commit hooks, npm install
 make lint        # ruff, ruff format, mypy strict on risk_engine, next lint + tsc
-make test        # 255 backend tests (99% coverage on risk_engine) + 13 frontend tests
+make test        # 272 backend tests (99% coverage on risk_engine) + 13 frontend tests
 ```
 
 **Run the whole pipeline with no server at all:**
