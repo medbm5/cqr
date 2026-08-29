@@ -37,7 +37,7 @@ web: ## Run the Next.js frontend on :3000
 	$(NPM) --prefix $(FRONT) run dev
 
 run: ## Run the standalone risk_engine pipeline -> results.json
-	$(PY) -m risk_engine.cli --data data --out results.json
+	$(PY) -m risk_engine --data-dir data --out results.json
 
 eda: ## Open the exploratory analysis notebook
 	$(PY) -m jupyter lab notebooks/01_eda.ipynb
