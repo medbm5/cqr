@@ -18,11 +18,13 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.9
     hooks:
+      # Both the graded package and the repo tooling; ruff.toml at the root
+      # gives scripts/ the same settings backend/pyproject.toml defines.
       - id: ruff
         args: [--fix]
-        files: ^backend/
+        files: ^(backend|scripts)/
       - id: ruff-format
-        files: ^backend/
+        files: ^(backend|scripts)/
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.11.2
