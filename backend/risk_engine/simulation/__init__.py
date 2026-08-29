@@ -32,6 +32,7 @@ from .engine import (
 from .metrics import (
     DEFAULT_EXCEEDANCE_PROBABILITIES,
     ExceedanceCurve,
+    LossHistogram,
     LossMetrics,
     exceedance_curve,
     log_spaced_probabilities,
@@ -54,6 +55,7 @@ __all__ = [
     "DEFAULT_THRESHOLDS",
     "DRAWS_PER_BLOCK",
     "ExceedanceCurve",
+    "LossHistogram",
     "LossMetrics",
     "SensitivityCell",
     "SensitivityGrid",

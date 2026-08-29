@@ -302,6 +302,13 @@ class SimulationRequestSerializer(serializers.Serializer):
         max_value=MAX_CURVE_POINTS,
         help_text=f"Points per exceedance curve, at most {MAX_CURVE_POINTS}.",
     )
+    histogram_bins = serializers.IntegerField(
+        required=False,
+        default=40,
+        min_value=5,
+        max_value=200,
+        help_text="Bins across the simulated annual-loss distribution.",
+    )
     include_sensitivity = serializers.BooleanField(
         required=False,
         default=True,
@@ -338,6 +345,13 @@ class ExceedanceCurveSerializer(serializers.Serializer):
     loss_eur = serializers.ListField(child=serializers.FloatField())
 
 
+class LossHistogramSerializer(serializers.Serializer):
+    """The simulated annual-loss distribution, binned."""
+
+    bin_edges_eur = serializers.ListField(child=serializers.FloatField())
+    counts = serializers.ListField(child=serializers.IntegerField())
+
+
 class SensitivityCellSerializer(serializers.Serializer):
     """One point of the parameter sweep."""
 
@@ -372,6 +386,7 @@ class SimulationResponseSerializer(serializers.Serializer):
     metrics = LossMetricsSerializer()
     aep_curve = ExceedanceCurveSerializer()
     oep_curve = ExceedanceCurveSerializer()
+    histogram = LossHistogramSerializer()
     expected_loss_by_attack_type = serializers.DictField(child=serializers.FloatField())
     expected_incidents_by_attack_type = serializers.DictField(child=serializers.FloatField())
     n_years = serializers.IntegerField()

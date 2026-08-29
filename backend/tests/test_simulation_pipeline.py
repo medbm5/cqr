@@ -172,6 +172,9 @@ def test_the_cli_runs_the_whole_pipeline_into_one_document(tmp_path, fixtures_di
     )
     assert len(document["sensitivity"]["cells"]) == 9
 
+    histogram = document["simulation"].get("histogram")
+    assert histogram is None or len(histogram["bin_edges_eur"]) == len(histogram["counts"]) + 1
+
     curve = document["simulation"]["aep_curve"]
     assert curve["kind"] == "aep"
     assert len(curve["loss_eur"]) == len(curve["exceedance_probability"])

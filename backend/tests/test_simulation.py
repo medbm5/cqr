@@ -394,3 +394,20 @@ def test_re_reading_a_curve_rejects_an_unknown_kind():
 def test_log_spaced_probabilities_reject_impossible_requests(points, finest, match):
     with pytest.raises(ValueError, match=match):
         log_spaced_probabilities(points, finest=finest)
+
+
+def test_the_histogram_bins_every_simulated_year():
+    result = simulate(frequency_of(3.0), constant_severity(1000.0), n_years=5_000, seed=12)
+
+    histogram = result.histogram(bins=20)
+
+    assert len(histogram.bin_edges_eur) == len(histogram.counts) + 1
+    assert sum(histogram.counts) == 5_000
+    assert list(histogram.bin_edges_eur) == sorted(histogram.bin_edges_eur)
+
+
+def test_the_histogram_needs_at_least_one_bin():
+    result = simulate(frequency_of(1.0), constant_severity(100.0), n_years=200, seed=0)
+
+    with pytest.raises(ValueError, match="bins must be at least 1"):
+        result.histogram(bins=0)

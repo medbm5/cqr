@@ -26,6 +26,7 @@ from risk_engine.severity import LognormalParams, SeverityModel
 
 from .metrics import (
     ExceedanceCurve,
+    LossHistogram,
     LossMetrics,
     exceedance_curve,
     log_spaced_probabilities,
@@ -127,6 +128,30 @@ class SimulationResult:
             series,
             kind=kind,
             probabilities=log_spaced_probabilities(points, finest=1.0 / series.size),
+        )
+
+    def histogram(self, *, bins: int = 40) -> LossHistogram:
+        """Bin the simulated years for a distribution chart.
+
+        Derived from the stored per-year series rather than returned by default,
+        because the bin count is a presentation choice and the series is already
+        here.
+
+        Args:
+            bins: Number of bins across the observed range.
+
+        Returns:
+            Bin edges in euros and the count of years in each.
+
+        Raises:
+            ValueError: If `bins` is below 1.
+        """
+        if bins < 1:
+            raise ValueError(f"bins must be at least 1, got {bins}")
+        counts, edges = np.histogram(self.annual_losses, bins=bins)
+        return LossHistogram(
+            bin_edges_eur=tuple(edges.tolist()),
+            counts=tuple(int(count) for count in counts),
         )
 
     def to_explanation(self) -> list[str]:

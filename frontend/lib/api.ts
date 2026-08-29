@@ -212,6 +212,7 @@ export interface SimulationRequest {
   severity_threshold?: SeverityClass;
   session_window_hours?: number;
   curve_points?: number;
+  histogram_bins?: number;
   include_sensitivity?: boolean;
   sensitivity_years?: number;
 }
@@ -229,6 +230,7 @@ export interface SimulationResponse {
   };
   aep_curve: ExceedanceCurve;
   oep_curve: ExceedanceCurve;
+  histogram: { bin_edges_eur: number[]; counts: number[] };
   expected_loss_by_attack_type: Partial<Record<AttackType, number>>;
   expected_incidents_by_attack_type: Partial<Record<AttackType, number>>;
   n_years: number;

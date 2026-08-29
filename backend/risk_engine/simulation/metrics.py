@@ -95,6 +95,19 @@ class ExceedanceCurve:
     return_period_years: tuple[float, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class LossHistogram:
+    """The simulated annual-loss distribution, binned for a chart.
+
+    Attributes:
+        bin_edges_eur: `bins + 1` edges in euros, ascending.
+        counts: Simulated years falling in each bin.
+    """
+
+    bin_edges_eur: tuple[float, ...]
+    counts: tuple[int, ...]
+
+
 def log_spaced_probabilities(points: int, *, finest: float) -> tuple[float, ...]:
     """Exceedance probabilities spaced evenly on a log scale.
 

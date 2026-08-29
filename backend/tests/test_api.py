@@ -230,6 +230,11 @@ def test_simulate_returns_metrics_curves_and_the_chain(client, dataset):
     assert body["aep_curve"]["kind"] == "aep"
     assert body["oep_curve"]["kind"] == "oep"
 
+    # The distribution behind the metrics, binned for a chart.
+    histogram = body["histogram"]
+    assert len(histogram["bin_edges_eur"]) == len(histogram["counts"]) + 1
+    assert sum(histogram["counts"]) == body["n_years"]
+
 
 def test_simulate_uses_documented_defaults(client, dataset):
     response = client.post("/api/simulate/", {"include_sensitivity": False}, format="json")

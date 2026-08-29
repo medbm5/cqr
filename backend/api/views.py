@@ -199,6 +199,7 @@ def _payload(result: Any, grid: Any, options: dict[str, Any]) -> dict[str, Any]:
         "metrics": result.metrics,
         "aep_curve": result.curve("aep", points=points),
         "oep_curve": result.curve("oep", points=points),
+        "histogram": result.histogram(bins=options["histogram_bins"]),
         "expected_loss_by_attack_type": {
             attack_type.value: value for attack_type, value in result.expected_loss_by_type.items()
         },
