@@ -236,7 +236,11 @@ export function SimulationView({ initial }: { initial: SimulationResponse }) {
           </motion.div>
 
           <motion.div {...reveal(3)}>
-            <ExceedanceCurves aep={result.aep_curve} oep={result.oep_curve} />
+            <ExceedanceCurves
+              aep={result.aep_curve}
+              oep={result.oep_curve}
+              metrics={metrics}
+            />
           </motion.div>
 
           {result.sensitivity ? (
