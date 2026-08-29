@@ -1,7 +1,7 @@
 # Runs on `git commit` after `make install` (which calls `pre-commit install`).
 # Mirrors `make lint` for the Python side so CI and local commits agree.
 default_language_version:
-  python: python3.12
+  python: python3.11
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

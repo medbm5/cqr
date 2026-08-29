@@ -50,7 +50,7 @@ prompts/              # one .md per feature (AI-usage annex required by the case
 
 ## Code standards
 
-- Python 3.12, type hints everywhere, mypy strict on `risk_engine`, ruff clean, PEP8.
+- Python 3.11, type hints everywhere, mypy strict on `risk_engine`, ruff clean, PEP8.
 - Docstrings on every public function: what, why (the modeling justification), args, returns.
 - Tests: pytest, small fixture CSVs under `backend/tests/fixtures/` (never the real data), cover edge cases named in the feature prompt. Every feature ships with its tests in the same commit.
 - Reproducibility: any randomness takes an explicit `seed`/`rng` argument.

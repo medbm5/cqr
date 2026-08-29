@@ -48,3 +48,15 @@
    reproducible from the raw inputs.
 6. **Docker is compose-based** (`docker/`), with `data/` mounted read-only into
    the API container.
+
+## Follow-up: Python target lowered to 3.11
+
+The original prompt (and CLAUDE.md) specified Python 3.12; the development
+machine runs 3.11.1, so `requires-python = ">=3.12"` made `make install` fail.
+On the human's confirmation the floor was lowered to 3.11 across
+`backend/pyproject.toml` (requires-python, ruff `target-version`, mypy
+`python_version`), `.pre-commit-config.yaml`, `docker/Dockerfile.api`, the README
+and CLAUDE.md itself.
+
+This was a configuration change only: no source file used 3.12-exclusive syntax,
+so lint, types and tests were unaffected.

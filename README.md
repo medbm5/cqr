@@ -41,4 +41,4 @@ make eda         # open the exploratory notebook
 Copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` →
 `frontend/.env.local` before running against anything but the dev defaults.
 
-Requires Python 3.12 and Node 20+.
+Requires Python 3.11+ and Node 20+.

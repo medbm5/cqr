@@ -6,8 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "citalid-risk-engine"
 version = "0.1.0"
 description = "Cyber risk quantification engine: annualized loss from SIEM/EDR telemetry and a peer incident base."
-readme = "../README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = { text = "Proprietary" }
 authors = [{ name = "Citalid case study" }]
 
@@ -54,7 +53,7 @@ include = ["risk_engine*"]
 # ----------------------------------------------------------------------------
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py311"
 extend-exclude = ["**/migrations/*"]
 
 [tool.ruff.lint]
@@ -92,7 +91,7 @@ convention = "google"
 # mypy — strict, risk_engine only (Django is not type-checked here)
 # ----------------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 strict = true
 warn_unreachable = true
 warn_no_return = true
