@@ -214,3 +214,16 @@ def test_the_incident_rate_is_plausible_for_this_company(fixtures_dir):
         f"lambda_incident = {estimate.lambda_incident:.4f}/yr is outside the "
         f"plausible band for a 1,200-employee ETI"
     )
+
+
+def test_the_explanation_describes_the_clustering_it_actually_does():
+    """Copy drifts from code silently; this is the guard.
+
+    The trace said "same asset and attack type" for a while after the key became
+    asset-only - wrong text served to every consumer of the API, the CLI and the
+    UI, with nothing failing.
+    """
+    trace = "\n".join(estimate_frequency([event(0.0)], window(100)).to_explanation())
+
+    assert "same asset, separated" in trace
+    assert "attack type" not in trace.split("Clustered them into")[1].split(".")[0]

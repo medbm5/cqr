@@ -13,7 +13,22 @@ export interface FunnelStage {
 }
 
 /**
- * How 45,840 rows become 5,325 attacks.
+ * The terminal stage: the rate the loss model actually consumes.
+ *
+ * Kept out of `FunnelStage` on purpose. It is not another count of the same
+ * thing — the stages above are events, this is a *rate per year*, and it
+ * arrives via a calibration rather than a filter. Giving it a proportional bar
+ * would draw 0.31 against 45,840 and render it invisible, while implying the
+ * two are the same measure. It gets its own row and the accent instead.
+ */
+export interface FunnelTerminal {
+  label: string;
+  value: number;
+  note: string;
+}
+
+/**
+ * How raw feed rows become the incident rate the loss model prices.
  *
  * Ordered stages, so the fill is the **ordinal ramp** — one hue, monotone
  * lightness — and the reader sees the order in the colour as well as in the
@@ -25,26 +40,46 @@ export interface FunnelStage {
  * (identity) inside an ordinal chart (position), and the reader would have to
  * hold two meanings for one channel.
  */
-export function Funnel({ stages }: { stages: FunnelStage[] }) {
+export function Funnel({
+  stages,
+  terminal,
+}: {
+  stages: FunnelStage[];
+  terminal?: FunnelTerminal;
+}) {
   const reduceMotion = useReducedMotion();
   const widest = Math.max(...stages.map((stage) => stage.value), 1);
 
   return (
     <ChartFrame
-      title="From feed rows to attacks"
+      title="From feed rows to loss incidents"
       hint="Each stage as a share of the raw rows both feeds delivered"
       columns={[
         { key: "stage", label: "Stage" },
-        { key: "value", label: "Events", numeric: true },
+        { key: "value", label: "Count", numeric: true },
         { key: "share", label: "Share of raw", numeric: true },
         { key: "note", label: "What happened" },
       ]}
-      rows={stages.map((stage) => ({
-        stage: stage.label,
-        value: fullNumber(stage.value),
-        share: percent(stage.value / widest),
-        note: stage.note,
-      }))}
+      rows={[
+        ...stages.map((stage) => ({
+          stage: stage.label,
+          value: fullNumber(stage.value),
+          share: percent(stage.value / widest),
+          note: stage.note,
+        })),
+        ...(terminal
+          ? [
+              {
+                stage: terminal.label,
+                value: terminal.value.toFixed(4),
+                // A rate is not a share of the rows above it; saying so would be
+                // a category error the table should not commit either.
+                share: "—",
+                note: terminal.note,
+              },
+            ]
+          : []),
+      ]}
     >
       <ol className="space-y-3">
         {stages.map((stage, index) => {
@@ -101,6 +136,36 @@ export function Funnel({ stages }: { stages: FunnelStage[] }) {
             </li>
           );
         })}
+
+        {terminal ? (
+          <motion.li
+            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.35,
+              // Last in the stagger, so the funnel visibly lands on it.
+              delay: reduceMotion ? 0 : stages.length * 0.12,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            className="!mt-5 border-t border-navy-800 pt-4"
+          >
+            <div className="flex items-baseline justify-between gap-4">
+              <p className="text-xs font-medium text-accent">{terminal.label}</p>
+              <p className="text-xs text-ink-muted">{terminal.note}</p>
+            </div>
+
+            <div className="mt-1.5 flex items-center gap-3">
+              {/* A badge, not a proportional bar: 0.31 against 45,840 would be
+                  one invisible pixel, and the two are not the same measure. */}
+              <span className="tabular inline-flex h-8 items-center rounded-lg border border-accent/40 bg-accent-soft px-3 text-base font-semibold text-accent">
+                {terminal.value.toFixed(2)}
+              </span>
+              <span className="text-xs text-ink-secondary">
+                loss-generating incidents per year — the rate the simulation draws from
+              </span>
+            </div>
+          </motion.li>
+        ) : null}
       </ol>
     </ChartFrame>
   );

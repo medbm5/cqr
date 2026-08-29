@@ -186,8 +186,9 @@ class FrequencyEstimate:
             )
 
         lines.append(
-            f"Clustered them into {self.episodes:,} episode(s): same asset and attack "
-            f"type, separated by at most {self.params.session_gap_hours:g}h of quiet."
+            f"Clustered them into {self.episodes:,} episode(s): same asset, separated "
+            f"by at most {self.params.session_gap_hours:g}h of quiet. One asset in one "
+            f"window is one attack, whatever mix of techniques fired."
         )
         if self.events_attack_grade:
             clustered = self.events_attack_grade - self.events_without_asset

@@ -3,7 +3,7 @@
 An alert is not an attack. One intrusion produces a burst of detections, so
 counting alerts would measure the estate's detection verbosity rather than how
 often it is attacked. This package filters telemetry to attack-grade events,
-clusters them into episodes per asset and attack type, and scales the count to a
+clusters them into episodes per asset, and scales the count to a
 yearly rate using the observed window - `365 / observed_days`, never a hardcoded
 horizon.
 

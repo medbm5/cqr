@@ -26,7 +26,7 @@ export default async function FrequencyPage() {
       <PageHeader
         eyebrow="How often attacks land"
         title="Frequency"
-        description="An alert is not an attack. Attack-grade events are clustered into episodes per asset and attack type, then scaled to a year on the observed window. Both conventions below are judgment calls, so both are controls."
+        description="An alert is not an attack. Attack-grade events are clustered into episodes per asset — one machine in one window is one attack — then scaled to a year and calibrated against the peer incident rate. Both conventions below are judgment calls, so both are controls."
       />
       <FrequencyView initial={initial} />
     </>

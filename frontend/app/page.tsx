@@ -95,7 +95,7 @@ export default async function Overview() {
             },
             {
               step: "Frequency",
-              body: "Attack-grade events clustered into episodes per asset and attack type, then annualized on the observed window.",
+              body: "Attack-grade events clustered into episodes per asset, annualized on the observed window, then calibrated into loss-generating incidents.",
             },
             {
               step: "Severity",

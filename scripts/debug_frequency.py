@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """Throwaway: print the frequency funnel, stage by stage.
 
-Answers one question - where does 45,840 raw rows become 5,325 episodes, and is
-each drop the size it should be? Run it before and after any change to the
-clustering, and compare.
+Answers one question - where does each stage lose rows, and is the drop the size
+it should be? Run it before and after any change to the clustering, and compare.
 
     python scripts/debug_frequency.py
     python scripts/debug_frequency.py --threshold critical --window 48

@@ -1,5 +1,9 @@
 import { ApiUnavailable } from "@/components/overview/unavailable";
-import { Funnel, type FunnelStage } from "@/components/telemetry/funnel";
+import {
+  Funnel,
+  type FunnelStage,
+  type FunnelTerminal,
+} from "@/components/telemetry/funnel";
 import { NormalizationCard } from "@/components/telemetry/normalization-card";
 import { SeverityDonut } from "@/components/telemetry/severity-donut";
 import { WeeklyArea } from "@/components/telemetry/weekly-area";
@@ -47,24 +51,46 @@ export default async function TelemetryPage() {
     {
       label: "Episodes",
       value: data.frequency.episodes,
-      note: `clustered within ${data.frequency.params.session_window_hours}h per asset and type`,
+      note: `clustered within ${data.frequency.params.session_window_hours}h per asset`,
     },
   ];
+
+  const calibration = data.frequency.calibration;
+  const terminal: FunnelTerminal | undefined =
+    data.frequency.lambda_incident !== null && calibration
+      ? {
+          label: "Loss incidents / yr",
+          value: data.frequency.lambda_incident,
+          note: `annualized x365/${data.frequency.observed_days}, then x p = ${calibration.p_materialize.toExponential(1)} calibrated on ${fullNumber(calibration.peer_companies)} peer organisations`,
+        }
+      : undefined;
 
   return (
     <>
       <PageHeader
         eyebrow="What the feeds saw"
         title="Telemetry"
-        description={`Two feeds delivered ${fullNumber(report.rows_read)} rows describing ${fullNumber(
-          report.total_events,
-        )} distinct events. The gap between those numbers is ${percent(
-          report.inflation_avoided,
-        )} of inflation that never reaches the model.`}
+        description={
+          terminal
+            ? `${fullNumber(report.rows_read)} raw rows → ${fullNumber(
+                report.total_events,
+              )} distinct events → ${fullNumber(
+                data.frequency.events_attack_grade,
+              )} attack-grade → ${fullNumber(
+                data.frequency.episodes,
+              )} episodes → ${terminal.value.toFixed(
+                2,
+              )} loss incidents a year. Each arrow discards something, and the last one is a calibration rather than a filter.`
+            : `Two feeds delivered ${fullNumber(report.rows_read)} rows describing ${fullNumber(
+                report.total_events,
+              )} distinct events. The gap between those numbers is ${percent(
+                report.inflation_avoided,
+              )} of inflation that never reaches the model.`
+        }
       />
 
       <div className="grid gap-4">
-        <Funnel stages={stages} />
+        <Funnel stages={stages} terminal={terminal} />
 
         <WeeklyArea weekly={data.telemetry.summary.weekly} />
 
