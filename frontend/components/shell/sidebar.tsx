@@ -61,7 +61,14 @@ export function Sidebar() {
                   />
                 ) : null}
                 <span className="relative flex flex-col">
-                  <span className="font-medium">{item.label}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium">{item.label}</span>
+                    {item.badge ? (
+                      <span className="rounded-full border border-navy-700 px-1.5 py-px text-[9px] font-medium uppercase tracking-wide text-ink-muted">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="hidden text-xs text-ink-muted lg:block">{item.hint}</span>
                 </span>
               </Link>

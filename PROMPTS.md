@@ -45,8 +45,9 @@ key** for sessionization. Both are recorded in `prompts/03_frequency.md`.
 | 12 | [12 — Plain-language hint tooltips](prompts/12_hint_tooltips.md) | `feat(web)` | 5 |
 | 13 | [13 — Loss plausibility cap and a readable loss histogram](prompts/13_loss_cap_histogram.md) | `feat(simulation)` | 0 |
 | 14 | [14 — Exceedance curves rendering on log axes](prompts/14_exceedance_curves.md) | `fix(web)` | 0 |
+| 15 | [15 — Roadmap page](prompts/15_roadmap.md) | `feat(web)` | 0 |
 
-15 annexes, 12,541 words, covering 203 lines of verbatim prompt.
+16 annexes, 13,426 words, covering 222 lines of verbatim prompt.
 
 ## Findings the model surfaced and a human judged
 

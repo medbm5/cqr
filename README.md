@@ -38,6 +38,8 @@ P(no loss)        73.7%           TVaR 99  EUR  15,134,257
 - **Explainability throughout** — every model object renders a numbered audit
   trail, every chart has a table twin, and every mathematical concept in the UI
   carries a plain-language tooltip.
+- **A roadmap page** — the seventeen next steps as a timeline, each stating what
+  exists today, what would change, and what the number or the product gains.
 
 ## Screenshots
 
@@ -80,7 +82,7 @@ Requires Python 3.11+ and Node 20+.
 ```bash
 make install     # editable backend install, pre-commit hooks, npm install
 make lint        # ruff, ruff format, mypy strict, next lint + tsc
-make test        # 272 backend tests (99% coverage on risk_engine) + 32 frontend
+make test        # 272 backend tests (99% coverage on risk_engine) + 42 frontend
 ```
 
 **The whole pipeline, no server:**
@@ -107,7 +109,7 @@ make eda         # the exploratory notebook
 
 | URL | What it is |
 |---|---|
-| http://localhost:3000 | The risk cockpit — the five pages above |
+| http://localhost:3000 | The risk cockpit — the five pages above, plus `/roadmap` |
 | http://localhost:8000/api/docs/ | Swagger UI over the five endpoints |
 | http://localhost:8000/api/schema/ | The OpenAPI schema |
 
