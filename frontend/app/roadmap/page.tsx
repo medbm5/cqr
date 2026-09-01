@@ -21,10 +21,15 @@ export default function RoadmapPage() {
       <RoadmapLegend />
       <RoadmapTimeline />
 
-      <p className="mt-10 pl-8 text-xs leading-relaxed text-ink-muted">
+      <p className="mt-10 max-w-3xl pl-8 text-xs leading-relaxed text-ink-muted">
         {ROADMAP.length} items. The order within each phase is by how much it would move the
         answer, not by how interesting it would be to build — which is why the cheapest item on
         the page sits at the top and the most interesting one sits at the bottom.
+      </p>
+      <p className="mt-3 max-w-3xl pl-8 text-xs leading-relaxed text-ink-muted">
+        The maths behind the modeling items — credibility, extreme-value theory, copulas,
+        proper scoring rules — is explained from first principles in{" "}
+        <code className="text-ink-secondary">CONCEPTS.md</code>, with a worked example for each.
       </p>
     </>
   );

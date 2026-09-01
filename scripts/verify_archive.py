@@ -32,6 +32,7 @@ FORBIDDEN = (
 REQUIRED = (
     "README.md",
     "METHODOLOGY.md",
+    "CONCEPTS.md",
     "DEPLOYMENT.md",
     "next_steps.md",
     "PROMPTS.md",
