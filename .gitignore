@@ -48,3 +48,7 @@ dist-archive/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# PowerPoint's own export of the deck, used to proof-read the slide layouts.
+# Regenerate it from the .pptx; it is not a source.
+deck/render/

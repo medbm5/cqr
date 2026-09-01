@@ -10,3 +10,9 @@ extend = "backend/pyproject.toml"
 # Repo tooling, not the graded package: docstrings are still required, but these
 # scripts print to stdout by design.
 "scripts/*" = ["T201"]
+
+# The presentation is written in French, so its copy legitimately contains the
+# characters RUF001 flags as look-alikes for ASCII: the multiplication sign, the
+# em dash, the almost-equal sign, the non-breaking space. Replacing them with
+# their ASCII look-alikes would be replacing correct typography with incorrect.
+"scripts/build_deck*.py" = ["T201", "RUF001", "RUF002", "RUF003"]
