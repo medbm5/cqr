@@ -1,8 +1,8 @@
 # Render blueprint for the API.
 #
 # The frontend is not here: it deploys to Vercel from `frontend/`, which is why
-# this file defines one service rather than two. See the Deployment section of
-# the root README for the click-through.
+# this file defines one service rather than two. See DEPLOYMENT.md for the
+# click-through.
 
 services:
   - type: web

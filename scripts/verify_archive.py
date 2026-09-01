@@ -31,6 +31,8 @@ FORBIDDEN = (
 #: archive is incomplete regardless of how clean it is.
 REQUIRED = (
     "README.md",
+    "METHODOLOGY.md",
+    "DEPLOYMENT.md",
     "next_steps.md",
     "PROMPTS.md",
     "Makefile",
