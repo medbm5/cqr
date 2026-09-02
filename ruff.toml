@@ -16,3 +16,4 @@ extend = "backend/pyproject.toml"
 # em dash, the almost-equal sign, the non-breaking space. Replacing them with
 # their ASCII look-alikes would be replacing correct typography with incorrect.
 "scripts/build_deck*.py" = ["T201", "RUF001", "RUF002", "RUF003"]
+"scripts/build_logic_doc.py" = ["T201", "RUF001", "RUF002", "RUF003"]

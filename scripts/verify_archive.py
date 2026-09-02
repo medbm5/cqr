@@ -33,6 +33,7 @@ REQUIRED = (
     "README.md",
     "METHODOLOGY.md",
     "CONCEPTS.md",
+    "logique_metier.pdf",
     "DEPLOYMENT.md",
     "next_steps.md",
     "PROMPTS.md",
