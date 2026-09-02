@@ -103,3 +103,21 @@ Navigation: Roadmap is last, carries the `vision` badge, and no other entry does
 `tests/setup.ts` gained stubs for `IntersectionObserver` and `ResizeObserver`,
 which jsdom does not implement and which `whileInView` and the clip measurement
 respectively mount on.
+
+---
+
+## Réduction ultérieure
+
+La roadmap a ensuite été ramenée de dix-sept à **dix chantiers**, sur demande :
+ne restent que ceux qui sont défendables à l'oral sans exposé théorique. Sept
+items ont été retirés — sensibilité à p_materialize, drilldown par actif,
+p_materialize piloté par la maturité, plafond dérivé de l'exposition,
+efficacité des contrôles, allocation par criticité, enrichissement threat
+intel — et `next_steps.md` a été coupé et renuméroté en conséquence.
+
+Ce qui a dû suivre : la diapositive 13 du deck citait « vulnérabilité FAIR
+pilotée par la maturité » comme suite d'un item désormais absent, remplacée par
+le mélange de crédibilité que la diapositive 7 annonce déjà comme priorité ;
+deux pointeurs vers `next_steps.md item 2` devenus faux dans `METHODOLOGY.md` et
+`calibration.py` ; et l'introduction de `CONCEPTS.md`, qui promettait une
+correspondance un-pour-un avec la roadmap.

@@ -40,12 +40,13 @@ describe("roadmap data", () => {
       "auth-workspaces",
       "connectors",
       "credibility",
-      "maturity-p-materialize",
       "gpd-tail",
       "copulas",
-      "asset-allocation",
       "backtesting",
       "ci-pipeline",
+      "run-history",
+      "report-export",
+      "observability",
     ]) {
       expect(ids.has(required), `missing roadmap item: ${required}`).toBe(true);
     }

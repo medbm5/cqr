@@ -38,7 +38,7 @@ P(no loss)        73.7%           TVaR 99  EUR  15,134,257
 - **Explainability throughout** — every model object renders a numbered audit
   trail, every chart has a table twin, and every mathematical concept in the UI
   carries a plain-language tooltip.
-- **A roadmap page** — the seventeen next steps as a timeline, each stating what
+- **A roadmap page** — the next steps as a timeline, each stating what
   exists today, what would change, and what the number or the product gains.
 
 ## Screenshots

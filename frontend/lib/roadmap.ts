@@ -58,19 +58,6 @@ export const PHASES: PhaseMeta[] = [
 export const ROADMAP: RoadmapItem[] = [
   // ------------------------------------------------- phase 1 — hardening
   {
-    id: "p-materialize-sensitivity",
-    title: "Report the answer's sensitivity to p_materialize",
-    phase: 1,
-    theme: "modeling",
-    effort: "S",
-    current:
-      "p_materialize is a single fitted scalar — 1.95e-4 on this data, one detected attack in 5,100 becoming a loss — and it appears only as a line in the explanation trace.",
-    change:
-      "Sweep it the way the severity threshold and session window are already swept, and surface the result beside the existing 3×3 sensitivity grid.",
-    impact:
-      "It is the single most influential number in the pipeline and currently the least visible. A reader could see how much of the headline rests on it instead of taking it on trust. This is the cheapest item on the list and the one with the best ratio of effort to honesty.",
-  },
-  {
     id: "backtesting",
     title: "Backtest against the incident base",
     phase: 1,
@@ -163,19 +150,6 @@ export const ROADMAP: RoadmapItem[] = [
     impact:
       "The two production incidents so far — an OOM kill and a gateway timeout — were both diagnosed by rebuilding them on a laptop. Instrumentation turns that guesswork into a first look at a dashboard, and would catch a slow drift in run time long before it becomes a 502.",
   },
-  {
-    id: "asset-drilldown",
-    title: "Per-asset drilldown",
-    phase: 2,
-    theme: "platform",
-    effort: "S",
-    current:
-      "Per-asset weekly episode data is computed on every request and used for exactly one thing — the heatmap.",
-    change:
-      "A per-asset view built on the data already in the response: episode history, severity mix and attack-type profile for one machine.",
-    impact:
-      "A presentation change rather than a modeling one, but it answers the question the heatmap raises and cannot resolve — which asset is that dark row, and what happened on it. Note this is *not* asset-level loss allocation, which needs a criticality multiplier the data does not support (phase 3).",
-  },
 
   // ------------------------------------------------ phase 3 — model depth
   {
@@ -192,19 +166,6 @@ export const ROADMAP: RoadmapItem[] = [
       "An estate genuinely attacked twice as often as its peers is currently priced identically to one that is not. The blend gives this company's own evidence real but not total weight — a middle ground between the old model, which trusted the telemetry completely, and the current one, which does not trust it at all. It was not built because nothing in the data pins k, and choosing one by feel would quietly decide how much a client's own evidence counts. It is still the first thing to build next.",
   },
   {
-    id: "maturity-p-materialize",
-    title: "Model p_materialize instead of fitting one scalar",
-    phase: 3,
-    theme: "modeling",
-    effort: "L",
-    current:
-      "One fitted number converts detected attacks into loss-generating incidents. It absorbs, in a single scalar, how noisy the sensors are, how good the controls are and how fast the response is.",
-    change:
-      "Split it the way FAIR does — p_materialize = p_control_failure(maturity) × p_impact_given_failure(asset, attack_type) — with the maturity term calibrated by regressing incident frequency on security_maturity_score across the base, controlling for size and sector.",
-    impact:
-      "A company at maturity 75 would show a genuinely lower incident rate than one at 35, which the current construction cannot express: both inherit the same peer-weighted anchor. It was not done because the regression needs an exposure denominator the base does not contain — it records incidents, not organisation-years at risk — so a low-maturity company appearing three times might be badly defended or simply unlucky. The single scalar is the honest version: visibly one number doing one job, rather than a model implying knowledge that is not there.",
-  },
-  {
     id: "gpd-tail",
     title: "GPD tail via peaks-over-threshold",
     phase: 3,
@@ -218,19 +179,6 @@ export const ROADMAP: RoadmapItem[] = [
       "VaR 99 and TVaR 99 are made almost entirely of that tail, so they are currently understated by an unknown margin. It was not done because three of the eight types have fewer than 15 exceedances above the weighted 90th percentile — including data_breach, which has the second-largest mean and therefore the tail most worth modelling. Fitting a GPD to a dozen points produces a shape parameter with enormous variance, so the honest move was to report the diagnostic and leave the fit alone.",
   },
   {
-    id: "exposure-cap",
-    title: "Derive the loss cap from the company's own exposure",
-    phase: 3,
-    theme: "modeling",
-    effort: "M",
-    current:
-      "Every drawn incident is clipped at the 99.9th percentile of the cleaned peer losses (€23,476,094) — real evidence, but a property of the peer population rather than of this company.",
-    change:
-      "A per-company exposure ceiling built from figures an engagement would already have — annual revenue, balance-sheet assets, the record count behind a GDPR exposure, contractual liability caps — and truncation of the severity distribution at fitting time rather than clipping of the draws at simulation time.",
-    impact:
-      "A 1,200-employee retailer and a 4,000-employee manufacturer currently sit under the same ceiling, which cannot be right: what an organisation can lose is a function of what it has. The assumption is not a small one — the cap removes 37.5% of the AAL and 52% of TVaR 99. Truncating rather than clipping is also statistically cleaner: it removes the point mass the current cap leaves at the ceiling, visible as a spike in the loss histogram. It was not done because the case data carries no financial profile for the target company at all.",
-  },
-  {
     id: "copulas",
     title: "Dependence between attack types",
     phase: 3,
@@ -242,44 +190,5 @@ export const ROADMAP: RoadmapItem[] = [
       "A Gaussian or t-copula over the per-type frequency draws, with the correlation matrix estimated from co-occurrence of attack types within the same company_id in the incident base, where several organisations appear more than once.",
     impact:
       "Independence understates the variance of the annual total and therefore both tail metrics — the aggregate is too well-behaved. Calibration raised the value of fixing it: at λ ≈ 0.31 the annual total is dominated by whether an incident happens at all, so correlation between types now shapes the tail materially, where at the old λ ≈ 9,168 the aggregate was so smooth that dependence barely registered.",
-  },
-  {
-    id: "control-effectiveness",
-    title: "Control effectiveness and a FAIR-style maturity adjustment",
-    phase: 3,
-    theme: "modeling",
-    effort: "L",
-    current:
-      "Maturity 55/100 affects only which peers are weighted, through the Gaussian kernel. It does not touch this company's own frequency or severity at all.",
-    change:
-      "Split the FAIR chain properly: threat event frequency (what arrives) × vulnerability (what gets through, a function of maturity) = loss event frequency, plus a maturity-dependent scaling on severity for containment.",
-    impact:
-      "Improving the security programme currently does not move the modelled loss, which is the wrong incentive for a tool meant to justify security spend. The risk to manage is double-counting: the telemetry already reflects this company's controls, since a well-defended estate generates different detections, so a maturity discount applied on top would deflate twice. Getting it right needs care about what each data source already encodes.",
-  },
-  {
-    id: "asset-allocation",
-    title: "Asset-level loss allocation by criticality",
-    phase: 3,
-    theme: "modeling",
-    effort: "M",
-    current:
-      "The output is one number for the whole company. The engine already knows episodes per asset — it just never carries that through to euros.",
-    change:
-      "Allocate each simulated incident to the asset whose episode generated it, then scale severity by a criticality multiplier, so a criticality-5 database costs more than a criticality-1 workstation.",
-    impact:
-      "The output becomes a ranked list of assets by expected annual loss, which is directly actionable and is the question a CISO actually asks. It was not done because the multiplier would be invented: the incident base records company-level losses, not per-asset ones, and the notebook found severity statistically independent of criticality in the telemetry — 26–27% attack-grade at every level. The data actively declines to supply this, so it needs an external source or an explicit, labelled assumption.",
-  },
-  {
-    id: "threat-intel",
-    title: "Threat-intelligence enrichment",
-    phase: 3,
-    theme: "data",
-    effort: "L",
-    current:
-      "The technique → attack-type mapping is a judgment call, with four attributions marked ARGUABLE in the source alongside their alternative and their event weight.",
-    change:
-      "Join the observed ATT&CK techniques to campaign and actor data — which actors use T1486, which sectors they target — and adjust per-type frequency by whether an actor active against Retail is known to use that technique.",
-    impact:
-      "It would make the mapping evidence-based rather than a judgment call, addressing the four attributions currently flagged as arguable. This is Citalid's own domain, and it would be the highest-value addition of anything on this page — but no such feed exists in the supplied data.",
   },
 ];

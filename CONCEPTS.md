@@ -1,8 +1,10 @@
 # Les concepts de la page /roadmap, de zéro à l'aisance
 
-La page `/roadmap` liste dix-sept chantiers, dont neuf sont des chantiers de
-**modélisation**. Chacun s'appuie sur un objet mathématique que la page se
-contente de nommer. Ce document explique ces objets.
+Ce document explique les objets mathématiques sur lesquels ce projet repose :
+ceux que le modèle utilise déjà, et ceux que la page `/roadmap` nomme sans les
+détailler. Certaines sections décrivent donc un mécanisme en production (le
+plafond de plausibilité, la décomposition FAIR de p_materialize), d'autres un
+chantier à venir (crédibilité, GPD, copules, backtesting).
 
 Le format est le même partout : **définition**, puis **intuition**, puis **les
 maths**, puis **un exemple chiffré à la main** sur des données assez petites

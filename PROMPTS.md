@@ -47,7 +47,7 @@ key** for sessionization. Both are recorded in `prompts/03_frequency.md`.
 | 14 | [14 — Exceedance curves rendering on log axes](prompts/14_exceedance_curves.md) | `fix(web)` | 0 |
 | 15 | [15 — Roadmap page](prompts/15_roadmap.md) | `feat(web)` | 0 |
 
-16 annexes, 13,426 words, covering 222 lines of verbatim prompt.
+16 annexes, 13,562 words, covering 222 lines of verbatim prompt.
 
 ## Findings the model surfaced and a human judged
 

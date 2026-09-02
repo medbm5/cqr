@@ -145,7 +145,8 @@ number.
   α < 1. The lognormal likely understates the extremes VaR and TVaR are made of.
 - **`p_materialize` is one fitted scalar** absorbing sensor noise, control
   quality and response speed. It is the single most influential number in the
-  pipeline and has no structure — see `next_steps.md` item 2.
+  pipeline and has no structure. Giving it one needs an exposure denominator the
+  incident base does not carry, so it is left visibly as one number doing one job.
 - **The telemetry no longer affects how often losses occur**, only what kind.
 - **`supply_chain` and `insider_error` get λ = 0.** No ATT&CK technique in either
   feed corresponds to them, though the incident base holds 78 and 129 such

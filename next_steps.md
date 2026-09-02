@@ -9,6 +9,8 @@ most interesting to write.
 
 ---
 
+---
+
 ## 1. Gamma-Poisson credibility: blend telemetry with base rates
 
 **The problem it fixes.** The engine no longer trusts the telemetry's magnitude
@@ -43,49 +45,9 @@ would build next.
 
 ---
 
-## 2. Model `p_materialize` instead of fitting one scalar
-
-**What it fixes.** The frequency stage now converts detected attacks into
-loss-generating incidents through a single fitted number:
-`lambda_incident = lambda_detected x p_materialize`, with `p_materialize`
-calibrated so the result matches the peer base rate. On the case data that is
-1.95e-4 — one detected attack in 5,100 becomes a loss.
-
-That scalar carries a lot of weight for something with no structure. It absorbs,
-in one number, how noisy this estate's sensors are, how good its controls are,
-and how quickly it responds. Worse, because the anchor is external, **the
-telemetry no longer influences how often losses happen at all** — it only decides
-the attack-type *mix*. Changing the severity threshold or the session window
-moves `lambda_detected` by a factor of thirty and leaves `lambda_incident`
-exactly where it was.
-
-**What it would look like.** Split it the way FAIR does:
-
-```
-p_materialize = p_control_failure(maturity) x p_impact_given_failure(asset, attack_type)
-```
-
-with the maturity term calibrated by regressing incident frequency on
-`security_maturity_score` across the base, controlling for size and sector. Then
-a company with maturity 75 would show a genuinely lower incident rate than one at
-35, which the current construction cannot express — both would inherit the same
-peer-weighted anchor.
-
-**Why it was not done.** The regression needs an exposure denominator the base
-does not contain: it records incidents, not organisation-years at risk, so a
-low-maturity company appearing three times could be badly defended or simply
-unlucky. Fitting a maturity curve on that would produce a confident-looking
-coefficient with no support. The single scalar is the honest version — it is
-visibly one number doing one job, rather than a model implying knowledge that is
-not there.
-
-**Related, and cheaper:** report the *sensitivity of the answer to
-`p_materialize`* explicitly, since it is now the single most influential number
-in the pipeline and currently appears only as a line in the trace.
-
 ---
 
-## 3. GPD tail via peaks-over-threshold
+## 2. GPD tail via peaks-over-threshold
 
 **The problem it fixes.** The severity stage already reports that a Pareto tail
 describes the extremes better than the fitted lognormal on **five of eight**
@@ -107,39 +69,9 @@ in my head.
 
 ---
 
-## 3b. Derive the loss cap from the company's own exposure
-
-**The problem it fixes.** Every drawn incident is currently clipped at the
-99.9th percentile of the cleaned peer losses (EUR 23,476,094). That bound is
-real evidence - it is the largest loss comparable organisations were actually
-observed to suffer - but it is a property of the *peer population*, not of this
-company. A 1,200-employee retailer and a 4,000-employee manufacturer sit under
-the same ceiling, which cannot be right: what an organisation can lose is a
-function of what it has.
-
-The cap is not a small correction. On the case data it removes **37.5% of the
-AAL** and **52% of TVaR 99**, so the assumption behind it carries about as much
-weight as the severity fit itself.
-
-**What it would look like.** A per-company exposure ceiling built from figures a
-risk quantification engagement would already have: annual revenue, balance-sheet
-assets, the record count behind a GDPR exposure, contractual liability caps. The
-cap becomes `min(business-interruption ceiling, data-liability ceiling, ...)`
-rather than a quantile, and the severity distribution is *truncated* at fitting
-time rather than the draws being clipped at simulation time - which is the
-statistically cleaner move, since clipping leaves a point mass at the ceiling
-that a truncated fit would not.
-
-**Why it wasn't done.** The case data carries no financial profile for the target
-company at all - no revenue, no assets, no customer count. Inventing one to
-justify a more sophisticated bound would have been a worse answer than reading
-the bound off the evidence that does exist and saying so. The point mass this
-leaves at the cap is visible in the loss histogram and labelled there rather than
-smoothed away.
-
 ---
 
-## 4. Dependence between attack types (copulas)
+## 3. Dependence between attack types (copulas)
 
 **The problem it fixes.** The simulation draws each attack type's Poisson count
 independently. Real campaigns do not work that way: a phishing wave lands
@@ -160,50 +92,9 @@ This has moved up the list.
 
 ---
 
-## 5. Control effectiveness and a FAIR-style maturity adjustment
-
-**The problem it fixes.** Maturity 55/100 currently affects only *which peers are
-weighted*, through the Gaussian kernel. It does not affect the company's own
-frequency or severity at all — so improving the security programme would not move
-the modelled loss, which is the wrong incentive for a tool meant to justify
-security spend.
-
-**What it would look like.** Split the FAIR chain properly: threat event
-frequency (what arrives) × vulnerability (what gets through, a function of
-maturity) = loss event frequency, and a maturity-dependent scaling on severity
-for containment. Calibrate the maturity → vulnerability curve by regressing loss
-on `security_maturity_score` in the incident base, controlling for size and
-sector.
-
-**Why it wasn't done.** Scope, and a real risk of double-counting: the telemetry
-already reflects this company's controls, since a well-defended estate generates
-different detections. Applying a maturity discount on top would deflate twice.
-Getting this right needs care about what each data source already encodes.
-
 ---
 
-## 6. Asset-level loss allocation by criticality
-
-**The problem it fixes.** The output is one number for the whole company. The
-question a CISO actually asks is "which assets carry it", and the engine already
-knows episodes per asset — it just never carries that through to euros.
-
-**What it would look like.** Allocate each simulated incident to the asset whose
-episode generated it, then scale severity by a criticality multiplier so a
-criticality-5 database costs more than a criticality-1 workstation. The output
-becomes a ranked list of assets by expected annual loss, which is directly
-actionable.
-
-**Why it wasn't done.** The multiplier would be invented. Nothing in the incident
-base ties loss to asset criticality — it records company-level losses, not
-per-asset ones — so any curve would be my assumption wearing a number's clothes.
-Notebook §5 found severity is statistically independent of criticality in the
-telemetry (26–27% attack-grade at every level), so the data actively declines to
-supply this. It needs an external source or an explicit, labelled assumption.
-
----
-
-## 7. Backtesting against the incident base
+## 4. Backtesting against the incident base
 
 **The problem it fixes.** Nothing currently validates the model's output against
 observed reality. Every check in the suite is internal consistency.
@@ -223,21 +114,9 @@ each held-out organisation's losses from its own peer group.
 
 ---
 
-## 8. Threat-intelligence enrichment
-
-**What it would look like.** Join the observed ATT&CK techniques to campaign and
-actor data — which actors use T1486, which sectors they target — to adjust
-per-type frequency by whether an actor active against Retail is known to use that
-technique. This is Citalid's own domain, and it is what would make the technique →
-attack-type mapping evidence-based rather than a judgment call.
-
-**Why it wasn't done.** No such feed is in the supplied data. It would be the
-highest-value addition if one were available, because it addresses the mapping
-flagged as `ARGUABLE` in four places.
-
 ---
 
-## 9. CI pipeline
+## 5. CI pipeline
 
 **What it would look like.** GitHub Actions running `make lint test` on push, a
 matrix over Python 3.11–3.13, the notebook executed with `nbconvert` to catch
@@ -250,7 +129,9 @@ themselves exist and run.
 
 ---
 
-## 10. Authentication on the API
+---
+
+## 6. Authentication on the API
 
 **What it would look like.** The API is `AllowAny` and read-only, which is right
 for a local case study and wrong for anything else. Token or session auth on the
@@ -264,10 +145,10 @@ oversight someone discovers later.
 
 ---
 
+---
+
 ## Smaller things
 
-- **Per-asset weekly episode data is computed but barely used** — the heatmap
-  shows it; a per-asset drilldown would use it properly.
 - **`results.json` has no schema.** It is consumed by nothing but a human today,
   but if the frontend ever read it directly it would want one.
 - **The notebook re-derives constants the engine also computes.** They agree

@@ -1134,10 +1134,10 @@ plafond de plausibilité, visible et non dissimulé.
 
     items = [
         (
-            "p_materialize est un scalaire",
-            "un seul nombre absorbe le bruit des sondes, la qualité des contrôles et la vitesse "
-            "de réaction",
-            "→ vulnérabilité FAIR pilotée par la maturité",
+            "La télémétrie ne pilote plus le niveau",
+            "le taux d'incidents est entièrement ancré sur les pairs ; sept mois d'observation "
+            "propre pèsent zéro",
+            "→ mélange de crédibilité Gamma-Poisson",
         ),
         (
             "Fenêtre de sept mois",
@@ -1206,13 +1206,13 @@ plafond de plausibilité, visible et non dissimulé.
         """
 Ces quatre limites ne sont pas des oublis mais des arbitrages, chacun écrit dans le dépôt avec
 la raison de ne pas l'avoir traité.
-La plus gênante est la première : p_materialize fait correspondre cette entreprise à ses pairs
-mais ne sait pas dire pourquoi, si bien qu'améliorer la maturité de 55 à 75 ne bougerait pas la
-perte modélisée — le mauvais signal pour un outil censé justifier un budget sécurité.
-Ce que je n'ai pas fait faute de données : la régression maturité vers vulnérabilité demande un
-dénominateur d'exposition que la base ne contient pas, puisqu'elle recense des incidents et non
-des années-organisation à risque, et fabriquer cette courbe aurait donné un coefficient
-d'allure confiante sans rien derrière.
+La plus gênante est la première : en ancrant le taux d'incidents entièrement sur les pairs, j'ai
+retiré tout poids à l'observation propre de l'entreprise — un parc réellement attaqué deux fois
+plus que ses pairs serait aujourd'hui tarifé à l'identique.
+Le correctif est un mélange de crédibilité Gamma-Poisson, où le poids accordé à la télémétrie
+croît avec la fenêtre d'observation. Ce que je n'ai pas fait faute de données : ce mélange
+demande de savoir combien d'années-organisation de télémétrie valent une année de taux de base,
+et une seule entreprise observée ne permet pas de l'estimer.
 """,
     )
 

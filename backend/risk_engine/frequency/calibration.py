@@ -64,9 +64,9 @@ class Calibration:
         lambda_incident: Loss-generating incidents per year, after calibration.
             This is the rate the simulation draws from.
         p_materialize: The share of detected attacks that become losses.
-            Deliberately a single scalar rather than a model: see
-            `next_steps.md`, where making it maturity-dependent is the natural
-            next move.
+            Deliberately a single scalar rather than a model: making it
+            maturity-dependent would need an exposure denominator the incident
+            base does not carry, so one visible number is the honest version.
         base_rate: The external anchor it was fitted against.
     """
 

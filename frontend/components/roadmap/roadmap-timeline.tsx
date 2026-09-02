@@ -12,7 +12,7 @@ import { RoadmapCard, THEME_DOT } from "./roadmap-card";
  *
  * A spine down the left with every card docked to it, grouped into three phases
  * under sticky headers. The single left rail is what carries the argument: these
- * are not seventeen independent ideas, they are one ordered sequence, and the
+ * are not a handful of independent ideas, they are one ordered sequence, and the
  * order is the claim.
  *
  * The spine draws itself against scroll progress rather than animating once on
@@ -88,7 +88,7 @@ export function RoadmapTimeline() {
  *
  * A legend rather than a tooltip on each card: three themes and three effort
  * sizes are few enough to learn in one pass, and repeating the definition
- * seventeen times would be noise.
+ * once per card would be noise.
  */
 export function RoadmapLegend() {
   const themes: { theme: RoadmapItem["theme"]; label: string }[] = [
