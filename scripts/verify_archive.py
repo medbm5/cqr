@@ -34,6 +34,7 @@ REQUIRED = (
     "METHODOLOGY.md",
     "CONCEPTS.md",
     "logique_metier.pdf",
+    "business_logic.pdf",
     "DEPLOYMENT.md",
     "next_steps.md",
     "PROMPTS.md",

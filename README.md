@@ -122,7 +122,7 @@ hosted demo; both URLs are local.
 |---|---|
 | [`METHODOLOGY.md`](METHODOLOGY.md) | How the number is built, the modeling choices and their justification, known limitations |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Deploying the API and frontend, and the free-tier constraints that shaped the defaults |
-| [`logique_metier.pdf`](logique_metier.pdf) | *En français.* Business logic page by page: the endpoint, its parameters, the call chain, the maths, and the answer to give out loud |
+| [`business_logic.pdf`](business_logic.pdf) | Business logic page by page: the endpoint, its parameters, the call chain, the maths, and the answer to give out loud. French version: [`logique_metier.pdf`](logique_metier.pdf) |
 | [`CONCEPTS.md`](CONCEPTS.md) | *En français.* Every mathematical concept the roadmap rests on, from zero: definition, intuition, the maths, and a worked example on small numbers |
 | [`next_steps.md`](next_steps.md) | What was deliberately not built, and why |
 | [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb) | The data audit every modeling constant is argued from |

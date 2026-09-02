@@ -51,6 +51,12 @@ def style(document: Document) -> None:
     normal.element.rPr.rFonts.set(qn("w:eastAsia"), BODY)
 
 
+#: Structure of the document being built, as a list of heading levels. Reset by
+#: `render_document`. Its only purpose is the parity check in `main`: a section
+#: added to one language and forgotten in the other is otherwise invisible.
+_OUTLINE: list[str] = []
+
+
 def heading(document: Document, text: str, level: int, *, new_page: bool = False) -> None:
     """A heading in the accent colour, without Word's default blue.
 
@@ -58,6 +64,7 @@ def heading(document: Document, text: str, level: int, *, new_page: bool = False
     inserting a break paragraph: an explicit break lands a blank page whenever
     the previous section happened to end near the bottom of one.
     """
+    _OUTLINE.append(f"h{level}{'/page' if new_page else ''}")
     paragraph = document.add_heading(level=level)
     run = paragraph.add_run(text)
     run.font.name = BODY
@@ -174,16 +181,20 @@ def table(document: Document, headers: list[str], rows: list[list[str]], widths=
     document.add_paragraph().paragraph_format.space_after = Pt(2)
 
 
-def answer(document: Document, text: str) -> None:
-    """The block to read out loud when the question comes."""
+def answer(document: Document, label: str, text: str) -> None:
+    """The block to read out loud when the question comes.
+
+    The label is a parameter because the two languages announce it differently
+    and the block is otherwise identical.
+    """
     paragraph = document.add_paragraph()
     paragraph.paragraph_format.left_indent = Pt(12)
     paragraph.paragraph_format.space_before = Pt(4)
     paragraph.paragraph_format.space_after = Pt(10)
-    label = paragraph.add_run("À DIRE  ")
-    label.bold = True
-    label.font.size = Pt(8.5)
-    label.font.color.rgb = ACCENT
+    tag = paragraph.add_run(f"{label}  ")
+    tag.bold = True
+    tag.font.size = Pt(8.5)
+    tag.font.color.rgb = ACCENT
     run = paragraph.add_run(text)
     run.font.size = Pt(10)
     run.italic = True
@@ -192,15 +203,19 @@ def answer(document: Document, text: str) -> None:
 # ------------------------------------------------------------------ document
 
 
-def build(f: dict, out: Path) -> None:
-    """Assemble the whole reference."""
+def new_document() -> Document:
+    """A blank document with this reference's page setup and typography."""
     document = Document()
     style(document)
-
     for section in document.sections:
         section.left_margin = section.right_margin = Pt(54)
         section.top_margin = section.bottom_margin = Pt(48)
+    return document
 
+
+def build_fr(f: dict) -> Document:
+    """The French reference."""
+    document = new_document()
     heading(document, "Logique métier, page par page", 1)
     para(
         document,
@@ -316,6 +331,7 @@ def build(f: dict, out: Path) -> None:
 
     answer(
         document,
+        "À DIRE",
         "Les deux outils ne sont pas complémentaires, ils sont partiellement redondants : "
         f"{f['dup_cross_feed']} événements portent le même actif, la même technique et le même "
         "horodatage des deux côtés. Je dédoublonne sur ce triplet en gardant la pire sévérité, "
@@ -409,6 +425,7 @@ def build(f: dict, out: Path) -> None:
 
     answer(
         document,
+        "À DIRE",
         "Une alerte n'est pas une attaque : une intrusion produit une rafale de détections. Je "
         f"regroupe par actif avec une fenêtre de silence de 24 h, ce qui ramène "
         f"{f['attack_grade']} événements attack-grade à {f['episodes']} épisodes, soit "
@@ -499,6 +516,7 @@ def build(f: dict, out: Path) -> None:
 
     answer(
         document,
+        "À DIRE",
         "Une perte est bornée à zéro, sans plafond, et s'étale sur quatre ordres de grandeur : "
         "c'est la signature d'une variable dont le logarithme est à peu près normal, donc "
         "lognormale. J'ajuste par maximum de vraisemblance pondéré sur les logs — concrètement "
@@ -621,6 +639,7 @@ def build(f: dict, out: Path) -> None:
 
     answer(
         document,
+        "À DIRE",
         "Pour chaque année simulée je tire un nombre d'incidents par type dans une loi de "
         "Poisson, je prix chaque incident dans la lognormale de son type, et je somme. Cent "
         "mille années, graine 42, reproductible au centime. Je simule plutôt que d'appliquer une "
@@ -680,9 +699,518 @@ def build(f: dict, out: Path) -> None:
         italic=True,
     )
 
-    out.parent.mkdir(parents=True, exist_ok=True)
-    document.save(str(out))
-    print(f"{out}")
+    return document
+
+
+def build_en(f: dict) -> Document:
+    """The English reference. Block for block the same document as `build_fr`."""
+    document = new_document()
+    heading(document, "Business logic, page by page", 1)
+    para(
+        document,
+        "For each page of the cockpit: the endpoint it calls, its parameters, the chain of "
+        "functions it runs through, and the maths behind the calculation. Every section ends "
+        "with the answer to give out loud.",
+        color=MUTED,
+    )
+    para(
+        document,
+        f"Engine figures, seed 42, {f['n_years']} simulated years. Every value quoted here comes "
+        "from deck/figures.json, written by the pipeline.",
+        size=9,
+        color=MUTED,
+        italic=True,
+    )
+
+    # ------------------------------------------------------------- overview
+    heading(document, "Overview", 2)
+    table(
+        document,
+        ["Page", "Endpoint", "Parameters", "Cost"],
+        [
+            ["Overview", "the four below", "\u2014", "all cached"],
+            [
+                "Telemetry",
+                "`GET /api/telemetry/summary/`\n`GET /api/frequency/`",
+                "none",
+                "cached",
+            ],
+            [
+                "Frequency",
+                "`GET /api/frequency/`\n`GET /api/assets/`",
+                "threshold, window",
+                "~1 s",
+            ],
+            ["Severity", "`GET /api/severity/`", "none", "cached"],
+            ["Simulation", "`POST /api/simulate/`", "7 (see \u00a74)", "a few s"],
+        ],
+    )
+    bullets(
+        document,
+        [
+            "**One architectural rule**: the view parses the request, calls the engine, "
+            "serializes. No risk maths in Django, none in the frontend.",
+            "**Two levels of cache**: `get_dataset()` loads and fits once for all \u2014 the CSVs "
+            "do not change \u2014 while `get_frequency()` and `get_simulation()` are memoized per "
+            "parameter set.",
+            "**Every result object exposes** `to_explanation()` \u2014 the numbered trace the CLI "
+            "prints, the API serves and the UI displays. One version of each figure.",
+        ],
+    )
+
+    # ============================================================ TELEMETRY
+    heading(document, "1. Telemetry \u2014 what the sensors saw", 2, new_page=True)
+
+    heading(document, "Endpoint and parameters", 3)
+    code(document, "GET /api/telemetry/summary/      (no parameters)\nGET /api/frequency/")
+    bullets(
+        document,
+        [
+            "The second call serves only the **last stage of the funnel**: the incident rate the "
+            "simulation consumes.",
+            "No parameters: normalization depends on no convention.",
+        ],
+    )
+
+    heading(document, "Call chain", 3)
+    numbered(
+        document,
+        [
+            "`load_assets()` \u2014 reads the reference for the 20 assets.",
+            "`load_siem()` / `load_edr()` \u2014 read each export and translate it into canonical "
+            "`SecurityEvent`s. This is where the two severity scales are brought into one shared "
+            "vocabulary.",
+            "`severity_from_siem_label()` \u2014 `Low/Medium/High/Critical` \u2192 class.",
+            "`severity_from_edr_risk()` \u2014 score 0\u2013999 \u2192 class, by cut points.",
+            "`merge_feeds()` \u2014 **deduplicates** over the union of both feeds and produces the "
+            "`NormalizationReport`.",
+            "`observed_window()` \u2014 derives the observation window from the events themselves.",
+            "`summarize_telemetry()` \u2014 aggregates into weekly buckets, severity mix, top "
+            "techniques.",
+        ],
+    )
+
+    heading(document, "The maths", 3)
+    bullets(
+        document,
+        [
+            "**Severity normalization.** The SIEM gives a label, the EDR a score. EDR cut "
+            "points: `< 50` low, `50\u201369` medium, `70\u201393` high, `\u2265 94` critical. "
+            "Numeric score attached to each class: 0.25 / 0.5 / 0.75 / 1.0.",
+            "**Deduplication key**: the triple `(asset_id, technique, observed_at)`. Two reports "
+            "carrying the same triple describe the same real event.",
+            "**Deduplicated over the union, not by a join.** Each feed already repeats keys "
+            "internally \u2014 761 times in the SIEM, 543 in the EDR \u2014 so an inner join would "
+            "multiply those duplicates and return 13,055 rows instead of the 12,343 true matches.",
+            "**Merge rule: the worst severity wins.** If the EDR sees critical and the SIEM "
+            "medium, critical is kept: the tool closest to the endpoint saw something. Averaging "
+            "would dilute a strong signal into a weak one.",
+            f"**Annualization factor** = 365 / observed days = 365 / {f['observed_days']} = "
+            f"**{f['annualization']}** (1 Nov 2025 \u2192 31 May 2026). Recomputed from the data, "
+            "never hardcoded.",
+        ],
+    )
+
+    heading(document, "Figures produced", 3)
+    table(
+        document,
+        ["Quantity", "Value", "Where it comes from"],
+        [
+            ["Raw rows", f["rows_read"], "sum of both exports"],
+            ["Distinct events", f["total_events"], "after deduplication"],
+            [
+                "Duplicates absorbed",
+                f["duplicates"],
+                f"{f['dup_cross_feed']} of them across feeds",
+            ],
+            [
+                "Inflation avoided",
+                f["inflation"],
+                "what a naive concatenation would have added",
+            ],
+        ],
+    )
+
+    answer(
+        document,
+        "SAY THIS",
+        "The two tools are not complementary, they are partly redundant: "
+        f"{f['dup_cross_feed']} events carry the same asset, the same technique and the same "
+        "timestamp on both sides. I deduplicate on that triple keeping the worst severity, which "
+        f"avoids {f['inflation']} of inflation on every downstream rate.",
+    )
+
+    # ============================================================ FREQUENCY
+    heading(document, "2. Frequency \u2014 how often we are attacked", 2, new_page=True)
+
+    heading(document, "Endpoint and parameters", 3)
+    code(
+        document,
+        "GET /api/frequency/?severity_threshold=high&session_window_hours=24\n"
+        "GET /api/assets/?severity_threshold=high&session_window_hours=24",
+    )
+    table(
+        document,
+        ["Parameter", "Default", "Effect"],
+        [
+            ["`severity_threshold`", "`high`", "minimum severity to count as an attack"],
+            ["`session_window_hours`", "`24`", "silence that opens a new episode"],
+        ],
+    )
+    para(
+        document,
+        "These two parameters are conventions, not measurements. They are exposed as dials in "
+        "the UI rather than hidden in the code.",
+        size=9.5,
+        color=MUTED,
+        italic=True,
+    )
+
+    heading(document, "Call chain", 3)
+    numbered(
+        document,
+        [
+            "`get_frequency(threshold, window)` \u2014 memoized per parameter pair.",
+            "`estimate_frequency()` \u2014 orchestrates the four steps below.",
+            "`is_attack_grade(event, threshold)` \u2014 filter: keeps only high and above.",
+            "`sessionize(events, params)` \u2014 groups events into **episodes**.",
+            "`attack_type_for(technique)` \u2014 classifies each MITRE technique into an attack "
+            "type through an explicit dictionary; the episode inherits the type of its worst "
+            "event.",
+            "`peer_weighted_base_rate(incidents, params)` \u2014 incidents per organisation-year "
+            "among peers.",
+            "`calibrate(lambda_detected, base_rate)` \u2014 fits `p_materialize` to reconcile the "
+            "two units.",
+        ],
+    )
+
+    heading(document, "The maths", 3)
+    bullets(
+        document,
+        [
+            "**Episode rule.** Grouped by **asset alone** \u2014 an intruder trips whatever "
+            "detections it meets, and counting each type separately would recount the same "
+            "intrusion under several names. The run is cut as soon as a silence exceeds the "
+            "window, measured against the **previous** event and not the first, otherwise a "
+            "three-day intrusion would be split artificially.",
+            f"**\u03bb detected** = episodes \u00d7 365 / observed days = {f['episodes']} \u00d7 "
+            f"{f['annualization']} = **{f['lambda_detected']} / yr**.",
+            "**Peer base rate** = weighted incidents \u00f7 weighted organisation-years. Numerator "
+            "*and* denominator carry the same similarity kernel, one record per `company_id` "
+            f"\u2014 that is **{f['peer_companies']} organisations**.",
+            "**The change of unit, the key point.** The telemetry counts *detected* attacks, the "
+            "external base counts *loss-causing* incidents. Those are two different units.",
+            f"**Calibration**: `\u03bb_incident = \u03bb_detected \u00d7 p`, with p set so that "
+            f"\u03bb_incident equals the peer rate. Here p \u2248 1 detection in "
+            f"**{f['p_one_in']}**, so \u03bb_incident = **{f['lambda_incident']} / yr**.",
+            "**The mix comes from the telemetry, the level from the base.** Each type gets "
+            "\u03bb_incident \u00d7 (its episodes / total episodes).",
+        ],
+    )
+
+    heading(document, "Figures produced", 3)
+    table(
+        document,
+        ["Quantity", "Value", "Calculation"],
+        [
+            ["Attack-grade events", f["attack_grade"], "severity \u2265 high"],
+            ["Episodes", f["episodes"], f"compression {f['compression']}"],
+            ["\u03bb detected", f"{f['lambda_detected']} / yr", "episodes \u00d7 365/212"],
+            [
+                "\u03bb incident",
+                f"{f['lambda_incident']} / yr",
+                f"\u03bb detected \u00f7 {f['p_one_in']}",
+            ],
+        ],
+    )
+
+    answer(
+        document,
+        "SAY THIS",
+        "An alert is not an attack: an intrusion produces a burst of detections. I group by "
+        f"asset with a 24-hour quiet window, which takes {f['attack_grade']} attack-grade events "
+        f"down to {f['episodes']} episodes, or {f['lambda_detected']} detected attacks a year. "
+        "But the telemetry counts detections and the external base counts loss-causing incidents "
+        f"\u2014 two different units. I reconcile them with a calibration: one detection in "
+        f"{f['p_one_in']} ends in a loss, giving {f['lambda_incident']} incident a year anchored "
+        f"on {f['peer_companies']} comparable organisations.",
+    )
+
+    # ============================================================= SEVERITY
+    heading(document, "3. Severity \u2014 what one incident costs", 2, new_page=True)
+
+    heading(document, "Endpoint and parameters", 3)
+    code(document, "GET /api/severity/      (no parameters)")
+    para(
+        document,
+        "No parameters: the severity model depends only on the target profile, which is fixed "
+        "for this case (Retail, ETI, maturity 55).",
+        size=9.5,
+        color=MUTED,
+        italic=True,
+    )
+
+    heading(document, "Call chain", 3)
+    numbered(
+        document,
+        [
+            "`load_incidents()` \u2014 reads and **cleans** the external base; also returns the "
+            "`CleaningReport`.",
+            "`repair_mojibake()` \u2014 repairs the double UTF-8 encoding of the sector labels, "
+            "which was splitting one sector into two.",
+            "`fit_severity_model()` \u2014 orchestrates the steps below, once for the pool then "
+            "once per attack type.",
+            "`peer_weights(incidents, params)` \u2014 one weight per incident, via "
+            "`sector_weight()`, `size_weight()` and `maturity_weight()`.",
+            "`effective_sample_size(weights)` \u2014 Kish n_eff, what the weighting costs.",
+            "`fit_lognormal(losses, weights)` \u2014 weighted maximum likelihood on the log scale.",
+            "`diagnose()` \u2014 assembles the evidence *against* the fit: `weighted_ks()`, "
+            "`qq_points()`, `fit_pareto_tail()`, `distribution_plot()`.",
+        ],
+    )
+
+    heading(document, "The maths", 3)
+    bullets(
+        document,
+        [
+            "**Cleaning.** Losses of `-1` are **missing values**, never \u20ac0. Two rows "
+            f"affected, excluded from the fit: **{f['incidents_fitted']} usable incidents of "
+            "1,600** remain.",
+            "**Soft weighting, never a hard filter.** A continuous weight per incident, the "
+            "product of three similarity factors: sector (1.0 if Retail, else 0.4), size (1.0 if "
+            "ETI, else 0.6) and a Gaussian kernel on the maturity distance, of bandwidth h = 15.",
+            f"**Why weight.** An exact filter on the profile leaves only **{f['hard_filter']} "
+            f"incidents of {f['incidents_fitted']}**, and no attack type retains a credible "
+            "sample. Mathematically clean, practically unusable.",
+            "**Weighted lognormal fit** on the log scale \u2014 it is simply a weighted mean and a "
+            "weighted variance:",
+        ],
+    )
+    code(
+        document,
+        "w      = w_sector \u00d7 w_size \u00d7 exp(\u2212 d\u00b2 / 2h\u00b2)      "
+        "d = |maturity \u2212 55|\n"
+        "mu     = \u03a3 w\u1d62 ln x\u1d62 / \u03a3 w\u1d62\n"
+        "sigma\u00b2 = \u03a3 w\u1d62 (ln x\u1d62 \u2212 mu)\u00b2 / \u03a3 w\u1d62",
+    )
+    bullets(
+        document,
+        [
+            "**Back to euros**: `median = e^mu` and `mean = e^(mu + sigma\u00b2/2)`. Careful: mu "
+            "and sigma are **not** the mean and standard deviation of the loss, but those of its "
+            "logarithm.",
+            f"**Example, supply chain**: mu = {f['sc_mu']}, sigma = {f['sc_sigma']} \u2192 median "
+            f"**{f['sc_median']}**, mean **{f['sc_mean']}**. The tail multiplies the mean by "
+            f"**{f['sc_ratio']}**: e^(sigma\u00b2/2).",
+            "**It is the mean that feeds the annual loss**, not the median. A decision-maker "
+            f"reasoning about the typical incident is wrong by a factor of {f['sc_ratio']}.",
+            "**Kish n_eff** = `(\u03a3w)\u00b2 / \u03a3w\u00b2`. It is the number of equally "
+            "weighted observations that would carry as much information. It measures the "
+            f"**evenness** of the weights, not their size. Below **{f['min_neff']}**, the type "
+            "falls back to the pooled distribution, and the substitution is recorded.",
+            f"**Evidence published with every fit**: weighted KS (here **{f['sc_ks']}** against "
+            "an indicative threshold \u2248 0.19), a QQ plot of the log-losses, and a **Pareto "
+            f"tail fitted as a rival** \u2014 it wins on {f['pareto_better']} fits of "
+            f"{f['fits_total']}, so VaR 99 and TVaR 99 read as lower bounds.",
+        ],
+    )
+
+    answer(
+        document,
+        "SAY THIS",
+        "A loss is bounded at zero, has no ceiling, and spans four orders of magnitude: that is "
+        "the signature of a variable whose logarithm is roughly normal, hence lognormal. I fit "
+        "by weighted maximum likelihood on the logs \u2014 concretely a weighted mean and variance "
+        "\u2014 one fit per attack type, because a single lognormal is rejected by "
+        "Kolmogorov-Smirnov. The weights come from a similarity kernel on sector, size and "
+        "maturity: I weight rather than filter, because an exact filter would leave only "
+        f"{f['hard_filter']} incidents. The price of that flexibility is a smaller effective "
+        "sample, which I publish type by type, with a fallback to the pooled distribution below "
+        "30.",
+    )
+
+    # =========================================================== SIMULATION
+    heading(document, "4. Simulation \u2014 what a year costs", 2, new_page=True)
+
+    heading(document, "Endpoint and parameters", 3)
+    code(
+        document,
+        "POST /api/simulate/\n"
+        "{\n"
+        '  "n_years": 5000,              "seed": 42,\n'
+        '  "severity_threshold": "high", "session_window_hours": 24,\n'
+        '  "loss_cap_eur": null,         "curve_points": 160,\n'
+        '  "histogram_bins": 40,         "include_sensitivity": true\n'
+        "}",
+    )
+    table(
+        document,
+        ["Parameter", "Default", "Effect"],
+        [
+            [
+                "`n_years`",
+                "5,000 (API) / 100,000 (CLI)",
+                "tail resolution; capped at 200,000",
+            ],
+            ["`seed`", "42", "bit-for-bit reproducibility"],
+            ["`severity_threshold`", "`high`", "frequency convention, see \u00a72"],
+            ["`session_window_hours`", "24", "frequency convention, see \u00a72"],
+            [
+                "`loss_cap_eur`",
+                f"99.9th percentile \u2248 {f['cap']}",
+                "per-incident ceiling; `inf` to disable",
+            ],
+            ["`curve_points`", "160", "resolution of the OEP/AEP curves"],
+            ["`histogram_bins`", "40", "histogram bins (log)"],
+            ["`include_sensitivity`", "`true`", "3\u00d73 grid \u2014 nine more runs"],
+        ],
+    )
+
+    heading(document, "Call chain", 3)
+    numbered(
+        document,
+        [
+            "`get_simulation(n_years, seed, threshold, window, cap)` \u2014 memoized; **the cap is "
+            "part of the cache key**, two ceilings are two answers.",
+            "`simulate()` \u2014 the Monte Carlo loop, vectorized over blocks of years.",
+            "`rng.poisson(lam=\u03bb_type, size=block)` \u2014 the incident count of each year.",
+            "`rng.lognormal(mean=mu, sigma=sigma, size=total)` \u2014 the price of each incident.",
+            "`np.minimum(losses, cap)` \u2014 the plausibility ceiling.",
+            "`np.bincount(years, weights=losses)` \u2014 folds incidents back into their year.",
+            "`summarize(annual_losses)` \u2014 AAL, median, VaR, TVaR, P(no loss), maximum.",
+            "`exceedance_curve(series, kind)` \u2014 AEP (annual total) and OEP (largest single "
+            "loss) curves.",
+            "`SimulationResult.histogram(scale='log')` \u2014 log bins, zero years counted apart.",
+            "`sensitivity_grid()` \u2014 replays threshold \u00d7 window and "
+            "reports the AAL of each cell.",
+        ],
+    )
+
+    heading(document, "The maths", 3)
+    bullets(
+        document,
+        [
+            "**Compound Poisson.** The annual loss is a sum of a random number of random terms:",
+        ],
+    )
+    code(
+        document,
+        "S = \u03a3\u1d62\u208c\u2081\u1d3f X\u1d62    with N ~ Poisson(\u03bb)  and  "
+        "X\u1d62 ~ Lognormal(mu, sigma)",
+    )
+    bullets(
+        document,
+        [
+            "**Compound, do not multiply.** A year is not frequency times mean cost: it is zero "
+            f"incidents **{f['p_no_loss']}**, one sometimes, two very rarely \u2014 and the sum of "
+            "those cases is not the product of the means.",
+            "**Why simulate rather than use a formula.** The expectation is analytic (Wald's "
+            "identity: `E[S] = \u03bb \u00d7 E[X]`), but **the distribution function of S has no "
+            "closed form**. And VaR 99 and TVaR 99 are quantiles of S. The full distribution is "
+            "required.",
+            "**What fixes the number of years**: VaR 99 rests on only 1% of the years. Over "
+            f"{f['n_years']} years that is 1,000 observations; over 1,000 years, ten \u2014 "
+            "unusable. The tail decides, not the mean.",
+            "**Metrics**: `VaR_\u03b1` = quantile of order \u03b1; `TVaR_\u03b1` = "
+            "`E[S | S \u2265 VaR_\u03b1]`. `TVaR \u2265 VaR` by construction \u2014 a tested "
+            "invariant.",
+            "**AEP vs OEP.** AEP = the year's total; OEP = the year's largest single loss. OEP "
+            "can never exceed AEP at equal probability, and their gap measures the share of years "
+            "with several incidents.",
+            f"**Plausibility ceiling.** A lognormal has no upper bound: at sigma {f['sc_sigma']} "
+            f"and over {f['n_years']} years it eventually draws an incident costing more than the "
+            "company is worth (\u20ac3.8bn uncapped). Every loss is therefore clipped at "
+            f"**{f['cap']}**, the 99.9th percentile of the losses comparable organisations were "
+            f"actually observed to suffer \u2014 {f['cap_share']} of draws are affected.",
+            "**The ceiling's effect is reported, not absorbed**: the result carries "
+            "`draws_capped`, `draws_total` and `aal_uncapped`.",
+        ],
+    )
+
+    heading(document, "Figures produced", 3)
+    table(
+        document,
+        ["Measure", "Value", "Business reading"],
+        [
+            ["AAL", f["aal"], "the budget line"],
+            ["Median year", f["median_year"], f"{f['p_no_loss']} with no incident"],
+            ["VaR 95", f["var95"], "risk appetite \u2014 1 year in 20"],
+            ["TVaR 95", f["tvar95"], "mean of the worst 5% of years"],
+            ["VaR 99", f["var99"], "1 year in 100"],
+            ["TVaR 99", f["tvar99"], "the survival question"],
+        ],
+    )
+    para(
+        document,
+        "The TVaR 95 / VaR 95 ratio is 5.9: once past the threshold of the bad year, the typical "
+        "loss is almost six times that threshold. That is the definition of a heavy tail.",
+        size=9.5,
+        color=MUTED,
+    )
+
+    answer(
+        document,
+        "SAY THIS",
+        "For each simulated year I draw an incident count per attack type from a Poisson "
+        "distribution, price each incident in its type's lognormal, and sum. A hundred thousand "
+        "years, seed 42, reproducible to the cent. I simulate rather than apply a formula because "
+        "the expectation is analytic but the quantiles are not: VaR 99 and TVaR 99 need the full "
+        "distribution. And I cap each single loss at the 99.9th percentile of the losses observed "
+        "among peers, because an unbounded lognormal eventually draws a \u20ac3.8 billion year for "
+        "a 1,200-person company \u2014 the cap removes 37.5% of the AAL, and I show that rather "
+        "than absorb it.",
+    )
+
+    # ============================================================ cheatsheet
+    heading(
+        document,
+        "Cheat sheet: five questions, five thirty-second answers",
+        2,
+        new_page=True,
+    )
+    table(
+        document,
+        ["Question", "Answer"],
+        [
+            [
+                "Why deduplicate?",
+                f"{f['dup_cross_feed']} events are seen by both feeds. Concatenating would "
+                f"inflate every rate by {f['inflation']}.",
+            ],
+            [
+                "Why episodes?",
+                "An intrusion produces a burst of alerts. Counting alerts would measure the "
+                "estate's detection verbosity, not how often it is attacked.",
+            ],
+            [
+                "Why a calibration?",
+                "The telemetry counts detected attacks, the external base counts loss-causing "
+                "incidents. Multiplying the two directly is a category error \u2014 it is what "
+                "produced \u20ac12.5bn.",
+            ],
+            [
+                "Why weight rather than filter?",
+                f"An exact filter leaves only {f['hard_filter']} incidents and no modellable "
+                "type. Weighting keeps everyone, with the closest dominating.",
+            ],
+            [
+                "Why Monte Carlo?",
+                "The expectation has a formula, the quantiles do not. VaR 99 and TVaR 99 require "
+                "the full compound distribution.",
+            ],
+        ],
+    )
+
+    para(
+        document,
+        "Mathematical concepts in detail: CONCEPTS.md (in French). Modeling decisions and their "
+        "justification: METHODOLOGY.md. What was not built and why: next_steps.md.",
+        size=9,
+        color=MUTED,
+        italic=True,
+    )
+
+    return document
 
 
 def to_pdf(docx: Path) -> Path | None:
@@ -707,18 +1235,96 @@ def to_pdf(docx: Path) -> Path | None:
     return pdf
 
 
+#: French number forms that need an English rendering. The pipeline writes
+#: `deck/figures.json` in French convention - space for thousands, comma for
+#: decimals, "12 M€" with the sign after - because the deck is French. The
+#: English document reads the same file and converts, so the two versions can
+#: never quote different numbers.
+_CURRENCY = re.compile(r"^([\d  ,.]+?)\s*(k€|M€|Md€|€)$")
+
+
+def anglicise(figures: dict) -> dict:
+    """Re-render French-formatted figures in English convention.
+
+    "45 840" -> "45,840", "42,4 %" -> "42.4%", "5,1 M€" -> "€5.1M".
+    """
+
+    def convert(text: str) -> str:
+        currency = _CURRENCY.match(text)
+        if currency:
+            digits, unit = currency.groups()
+            suffix = {"k€": "k", "M€": "M", "Md€": "bn", "€": ""}[unit]
+            return "€" + _swap(digits.strip()) + suffix
+        if text.endswith(" %"):
+            return _swap(text[:-2]) + "%"
+        return _swap(text)
+
+    converted = {key: convert(value) for key, value in figures.items()}
+    # Two entries carry French words as well as digits.
+    share = convert(figures["p_no_loss"].replace(" des années", ""))
+    converted["p_no_loss"] = f"{share} of years"
+    converted["median_year"] = "€0"
+    return converted
+
+
+#: French grouping and decimal marks mapped to English ones. `str.translate`
+#: applies every mapping in a single pass, so no placeholder character is
+#: needed to stop the comma substitutions from colliding.
+_FR_TO_EN = str.maketrans({" ": ",", " ": ",", ",": "."})
+
+
+def _swap(text: str) -> str:
+    """Swap French digit grouping and decimal mark for English ones."""
+    return text.translate(_FR_TO_EN)
+
+
+#: Language code -> (builder, output stem).
+LANGUAGES = {
+    "fr": (build_fr, "logique_metier"),
+    "en": (build_en, "business_logic"),
+}
+
+
 def main() -> int:
-    """Read the verified figures and build the reference."""
+    """Build the reference in each requested language."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--figures", type=Path, default=ROOT / "deck" / "figures.json")
-    parser.add_argument("--out", type=Path, default=ROOT / "logique_metier.docx")
+    parser.add_argument("--out-dir", type=Path, default=ROOT)
+    parser.add_argument("--lang", choices=[*LANGUAGES, "all"], default="all")
     parser.add_argument("--no-pdf", action="store_true")
     args = parser.parse_args()
 
     figures = json.loads(args.figures.read_text(encoding="utf-8"))
-    build(figures, args.out)
-    if not args.no_pdf:
-        to_pdf(args.out)
+    wanted = LANGUAGES if args.lang == "all" else {args.lang: LANGUAGES[args.lang]}
+
+    outlines: dict[str, list[str]] = {}
+    for language, (builder, stem) in wanted.items():
+        _OUTLINE.clear()
+        document = builder(anglicise(figures) if language == "en" else figures)
+        outlines[language] = list(_OUTLINE)
+
+        docx = args.out_dir / f"{stem}.docx"
+        docx.parent.mkdir(parents=True, exist_ok=True)
+        document.save(str(docx))
+        print(f"  [{language}] {docx.name}")
+        if not args.no_pdf:
+            pdf = to_pdf(docx)
+            if pdf is not None:
+                print(f"  [{language}] {pdf.name}")
+
+    # Parity guard: the two documents must have the same shape. A section added
+    # to one language and forgotten in the other is otherwise invisible until
+    # someone reads both side by side.
+    if len(outlines) == 2:
+        first, second = outlines["fr"], outlines["en"]
+        if first != second:
+            print(
+                f"  ATTENTION: structures divergentes - fr {len(first)} titres, "
+                f"en {len(second)} titres",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"  structures identiques ({len(first)} titres)")
     return 0
 
 
